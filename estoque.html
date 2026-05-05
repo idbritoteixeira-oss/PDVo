@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PDVo">
+  <link rel="apple-touch-icon" href="./assets/icons/icon.php?size=180">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDVo - Estoque</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./assets/css/pdv.css">
+</head>
+<body>
+  <script src="./assets/js/app.js"></script>
+  <script src="./assets/js/sidebar.js"></script>
+  <script>renderSidebar('estoque.html');</script>
+
+  <main class="main-content">
+    <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
+      <h1 class="text-2xl text-center font-bold">Gerenciar Estoque</h1>
+      <button onclick="openMovModal()" class="btn btn-primary">+ Registrar Movimentação</button>
+    </div>
+
+    <div id="alerta-estoque" class="hidden card mb-4 border-l-4 border-l-red-500">
+      <h3 class="font-semibold text-red-400 mb-2">⚠ Produtos com Estoque Baixo</h3>
+      <div id="alerta-lista" class="grid grid-cols-2 md:grid-cols-4 gap-2"></div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="flex gap-3 mb-3 flex-wrap">
+        <input id="f-busca" type="text" class="input-dark flex-1 min-w-40" placeholder="Buscar produto..." oninput="loadProdutos()">
+        <label class="flex items-center gap-2 text-sm whitespace-nowrap cursor-pointer">
+          <input id="f-baixo" type="checkbox" onchange="loadProdutos()" class="w-4 h-4"> Apenas estoque baixo
+        </label>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>Unidade</th>
+              <th>Custo</th>
+              <th>Estoque Atual</th>
+              <th>Mínimo</th>
+              <th>Situação</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="produtos-body">
+            <tr><td colspan="7" class="text-center py-6 text-gray-500">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="font-semibold mb-3">Histórico de Movimentações</h2>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Produto</th>
+              <th>Tipo</th>
+              <th>Quantidade</th>
+              <th>Antes</th>
+              <th>Depois</th>
+              <th>Motivo</th>
+              <th>Operador</th>
+            </tr>
+          </thead>
+          <tbody id="mov-body">
+            <tr><td colspan="8" class="text-center py-6 text-gray-500">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="painel-assinatura"></div>
+  </main>
+
+  <!-- Modal movimentação -->
+  <div id="modal-mov" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h3 class="modal-title">Registrar Movimentação de Estoque</h3>
+      <div class="mb-3">
+        <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Produto *</label>
+        <input id="mov-produto-search" type="text" class="input-dark" placeholder="Buscar produto...">
+        <div id="mov-produto-results" class="hidden bg-gray-800 border border-gray-700 rounded-lg mt-1 max-h-40 overflow-y-auto"></div>
+        <input type="hidden" id="mov-produto-id">
+        <div id="mov-produto-info" class="hidden mt-2 p-2 bg-gray-800 rounded-lg text-sm">
+          <span id="mov-produto-nome" class="font-semibold"></span>
+          <span class="text-gray-400 ml-2">Estoque atual: </span>
+          <span id="mov-produto-estoque" class="text-blue-400 font-bold"></span>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Tipo *</label>
+        <select id="mov-tipo" class="input-dark">
+          <option value="entrada">Entrada (compra/reposição)</option>
+          <option value="saida">Saída manual</option>
+          <option value="ajuste">Ajuste (define valor absoluto)</option>
+          <option value="perda">Perda / Avaria</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Quantidade *</label>
+        <input id="mov-qty" type="number" class="input-dark" step="any" min="0.001" placeholder="0">
+      </div>
+      <div class="mb-4">
+        <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Motivo / Observação</label>
+        <input id="mov-motivo" type="text" class="input-dark" placeholder="Ex: Compra NF 123, Perda por validade...">
+      </div>
+      <div class="flex gap-2">
+        <button onclick="closeMovModal()" class="btn btn-ghost flex-1 justify-center">Cancelar</button>
+        <button onclick="saveMov()"       class="btn btn-primary flex-1 justify-center">Registrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm delete modal -->
+  <div id="modal-del-prod" class="modal-overlay hidden">
+    <div class="modal-box" style="max-width:380px;text-align:center">
+      <div class="text-4xl mb-3">🗑️</div>
+      <h3 class="modal-title">Excluir Produto?</h3>
+      <p class="text-sm text-gray-400 mb-5" id="del-prod-nome">Este produto será excluído permanentemente.</p>
+      <div class="flex gap-3">
+        <button onclick="closeDelProd()" class="btn btn-ghost flex-1">Cancelar</button>
+        <button onclick="confirmarDelProd()" class="btn btn-danger flex-1">Excluir</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let _delProdId = null;
+
+    async function init() {
+      await checkAuth();
+      await loadProdutos();
+      await loadMovimentacoes();
+    }
+
+    async function loadProdutos() {
+      const busca = document.getElementById('f-busca').value;
+      const baixo = document.getElementById('f-baixo').checked;
+      let url = '/produtos.php?limit=200&ativo=1';
+      if (busca) url += `&busca=${encodeURIComponent(busca)}`;
+      if (baixo) url += '&estoque_baixo=1';
+
+      const res = await API.get(url);
+      if (!res?.ok) return;
+
+      const alertas = res.data.products.filter(p => parseFloat(p.estoque) <= parseFloat(p.estoque_minimo));
+      const alertDiv = document.getElementById('alerta-estoque');
+      if (alertas.length > 0) {
+        alertDiv.classList.remove('hidden');
+        document.getElementById('alerta-lista').innerHTML = alertas.map(p => `
+          <div class="p-2 bg-red-900/20 border border-red-800/40 rounded-lg text-sm">
+            <div class="font-semibold truncate">${p.nome}</div>
+            <div class="text-red-400">${formatNum(p.estoque)} ${p.unidade}</div>
+          </div>
+        `).join('');
+      } else alertDiv.classList.add('hidden');
+
+      const tbody = document.getElementById('produtos-body');
+      tbody.innerHTML = res.data.products.map(p => {
+        const est = parseFloat(p.estoque);
+        const min = parseFloat(p.estoque_minimo);
+        let situacao, classe;
+        if (est <= 0)       { situacao = 'Sem estoque'; classe = 'badge-danger';  }
+        else if (est <= min){ situacao = 'Estoque baixo'; classe = 'badge-warning'; }
+        else                { situacao = 'Normal'; classe = 'badge-success'; }
+        return `
+          <tr>
+            <td>
+              <div class="font-medium">${p.nome}</div>
+              <div class="text-xs text-gray-400">${p.codigo_barras || '-'}</div>
+            </td>
+            <td class="text-gray-400 text-sm">${p.unidade}</td>
+            <td class="text-gray-400 text-sm">${formatCurrency(p.custo || p.preco_custo)}</td>
+            <td class="font-bold ${est <= min ? 'text-red-400' : 'text-green-400'}">${formatNum(est)}</td>
+            <td class="text-gray-400 text-sm">${formatNum(min)}</td>
+            <td><span class="badge ${classe}">${situacao}</span></td>
+            <td>
+              <div class="flex gap-1 flex-wrap">
+                <button onclick="quickMov(${p.id}, '${p.nome.replace(/'/g,"\\'") }', ${est})"
+                  class="btn btn-ghost btn-sm">Movimentar</button>
+                <button onclick="abrirDelProd(${p.id}, '${p.nome.replace(/'/g,"\\'")}')"
+                  class="btn btn-danger btn-sm">Excluir</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="7" class="text-center py-6 text-gray-500">Nenhum produto encontrado.</td></tr>';
+    }
+
+    async function loadMovimentacoes() {
+      const res = await API.get('/estoque.php?limit=50');
+      if (!res?.ok) return;
+      const tbody = document.getElementById('mov-body');
+      if (!res.data.movimentacoes.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-gray-500">Nenhuma movimentação registrada.</td></tr>';
+        return;
+      }
+      const tipoLabel = { entrada:'Entrada', saida:'Saída', ajuste:'Ajuste', perda:'Perda' };
+      const tipoClass = { entrada:'badge-success', saida:'badge-warning', ajuste:'badge-info', perda:'badge-danger' };
+      tbody.innerHTML = res.data.movimentacoes.map(m => `
+        <tr>
+          <td class="text-xs text-gray-400">${new Date(m.created_at).toLocaleString('pt-BR')}</td>
+          <td class="font-medium text-sm">${m.produto_nome}</td>
+          <td><span class="badge ${tipoClass[m.tipo]}">${tipoLabel[m.tipo]}</span></td>
+          <td class="font-semibold">${formatNum(m.quantidade)}</td>
+          <td class="text-gray-400 text-sm">${formatNum(m.quantidade_anterior)}</td>
+          <td class="text-blue-400 font-semibold">${formatNum(m.quantidade_nova)}</td>
+          <td class="text-gray-400 text-sm">${m.motivo || '-'}</td>
+          <td class="text-gray-400 text-sm">${m.operador_nome}</td>
+        </tr>
+      `).join('');
+    }
+
+    function openMovModal() {
+      document.getElementById('modal-mov').classList.remove('hidden');
+      document.getElementById('mov-produto-id').value = '';
+      document.getElementById('mov-produto-info').classList.add('hidden');
+      document.getElementById('mov-produto-search').value = '';
+      document.getElementById('mov-qty').value    = '';
+      document.getElementById('mov-motivo').value = '';
+      setupMovSearch();
+    }
+    function closeMovModal() { document.getElementById('modal-mov').classList.add('hidden'); }
+
+    function quickMov(prodId, nome, estoque) {
+      openMovModal();
+      document.getElementById('mov-produto-id').value        = prodId;
+      document.getElementById('mov-produto-nome').textContent = nome;
+      document.getElementById('mov-produto-estoque').textContent = formatNum(estoque);
+      document.getElementById('mov-produto-info').classList.remove('hidden');
+      document.getElementById('mov-produto-search').value = nome;
+    }
+
+    function setupMovSearch() {
+      const input   = document.getElementById('mov-produto-search');
+      const results = document.getElementById('mov-produto-results');
+      let timer;
+      input.oninput = () => {
+        clearTimeout(timer);
+        timer = setTimeout(async () => {
+          const q = input.value.trim();
+          if (!q) { results.classList.add('hidden'); return; }
+          const res = await API.get(`/produtos.php?busca=${encodeURIComponent(q)}&limit=8&ativo=1`);
+          if (!res?.ok) return;
+          if (!res.data.products.length) { results.classList.add('hidden'); return; }
+          results.innerHTML = res.data.products.map(p => `
+            <div class="p-2 hover:bg-gray-700 cursor-pointer text-sm"
+                 onclick="selectMovProd(${p.id},'${p.nome.replace(/'/g,"\\'") }',${p.estoque})">
+              <span class="font-medium">${p.nome}</span>
+              <span class="text-gray-400 ml-2">${formatNum(p.estoque)} ${p.unidade}</span>
+            </div>
+          `).join('');
+          results.classList.remove('hidden');
+        }, 300);
+      };
+    }
+
+    function selectMovProd(id, nome, estoque) {
+      document.getElementById('mov-produto-id').value             = id;
+      document.getElementById('mov-produto-search').value         = nome;
+      document.getElementById('mov-produto-nome').textContent     = nome;
+      document.getElementById('mov-produto-estoque').textContent  = formatNum(estoque);
+      document.getElementById('mov-produto-info').classList.remove('hidden');
+      document.getElementById('mov-produto-results').classList.add('hidden');
+    }
+
+    async function saveMov() {
+      const prodId = document.getElementById('mov-produto-id').value;
+      const tipo   = document.getElementById('mov-tipo').value;
+      const qty    = parseFloat(document.getElementById('mov-qty').value);
+      const motivo = document.getElementById('mov-motivo').value;
+      if (!prodId)            { toast('Selecione um produto.', 'error'); return; }
+      if (isNaN(qty)||qty<=0) { toast('Quantidade inválida.', 'error'); return; }
+      const res = await API.post('/estoque.php', { product_id: parseInt(prodId), tipo, quantidade: qty, motivo });
+      if (!res?.ok) { toast(res?.data?.error || 'Erro.', 'error'); return; }
+      toast(`${res.data.message} Novo estoque: ${formatNum(res.data.estoque_novo)}`, 'success');
+      closeMovModal();
+      loadProdutos();
+      loadMovimentacoes();
+    }
+
+    // ---- Delete produto ----
+    function abrirDelProd(id, nome) {
+      _delProdId = id;
+      document.getElementById('del-prod-nome').textContent = `"${nome}" será desativado e não aparecerá mais nas listagens.`;
+      document.getElementById('modal-del-prod').classList.remove('hidden');
+    }
+    function closeDelProd() {
+      document.getElementById('modal-del-prod').classList.add('hidden');
+      _delProdId = null;
+    }
+    async function confirmarDelProd() {
+      if (!_delProdId) return;
+      const res = await fetch(`./api/produtos.php?id=${_delProdId}`, {
+        method: 'POST',
+        headers: { 'X-HTTP-Method-Override': 'DELETE' },
+        credentials: 'same-origin',
+      });
+      const data = await res.json();
+      closeDelProd();
+      if (res.ok) {
+        toast(data.message || 'Produto excluído.', 'success');
+        loadProdutos();
+      } else {
+        toast(data.error || 'Erro ao excluir.', 'error');
+      }
+    }
+
+    init();
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
+    }
+  </script>
+</body>
+</html>

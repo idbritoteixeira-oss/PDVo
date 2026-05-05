@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PDVo">
+  <link rel="apple-touch-icon" href="./assets/icons/icon.php?size=180">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDVo - Configurações</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./assets/css/pdv.css">
+</head>
+<body>
+  <script src="./assets/js/app.js"></script>
+  <script src="./assets/js/sidebar.js"></script>
+  <script>renderSidebar('configuracoes.html');</script>
+
+  <main class="main-content">
+    <div class="flex items-center justify-between mb-5">
+      <div class="flex items-center gap-3">
+        <div>
+          <h1 class="text-center text-2xl font-bold flex items-center gap-2">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Sistema
+            <button onclick="init()" class="p-1 hover:bg-gray-700 rounded-full transition-colors text-gray-400" title="Atualizar dados">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          </h1>
+          <p class="text-gray-400 text-sm">Apenas administradores podem alterar configurações.</p>
+        </div>
+      </div>
+      <button onclick="saveConfig()" class="btn btn-primary">Salvar</button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="card">
+        <h2 class="font-semibold text-base mb-4 border-b border-gray-700 pb-2">Dados da Empresa</h2>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Nome da Empresa</label>
+            <input id="cfg-nome_empresa" type="text" class="input-dark">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">CNPJ</label>
+            <input id="cfg-cnpj" type="text" class="input-dark" placeholder="00.000.000/0000-00">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Telefone</label>
+            <input id="cfg-telefone" type="text" class="input-dark">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Endereço</label>
+            <input id="cfg-endereco" type="text" class="input-dark">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">URL do Logo</label>
+            <input id="cfg-logo_url" type="url" class="input-dark" placeholder="https://...">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="font-semibold text-base mb-4 border-b border-gray-700 pb-2">Configurações PIX</h2>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Chave PIX</label>
+            <input id="cfg-pix_chave" type="text" class="input-dark" placeholder="CPF, E-mail, Celular ou Aleatória">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Nome completo do Recebedor</label>
+            <input id="cfg-pix_nome" type="text" class="input-dark" placeholder="Nome que aparece no QR Code">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Cidade do Recebedor</label>
+            <input id="cfg-pix_cidade" type="text" class="input-dark" placeholder="Ex: Jundiaí">
+          </div>
+          <div class="p-3 bg-blue-900/20 border border-blue-800/30 rounded-lg text-xs text-blue-500">
+            <strong>O sistema gera QR Codes PIX dinâmicos. Certifique-se de que a chave está correta.</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="font-semibold text-base mb-4 border-b border-gray-700 pb-2">Aparência</h2>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Tema do Sistema</label>
+            <select id="cfg-tema" class="input-dark" onchange="previewTema(this.value)">
+              <option value="light">☀️ Modo Claro</option>
+              <option value="dark">🌙 Modo Escuro</option>
+            </select>
+            <p class="text-xs mt-1" style="color: var(--text-muted)">A preferência de tema é salva por conta e aplicada ao fazer login.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="font-semibold text-base mb-4 border-b border-gray-700 pb-2">PDV e Caixa</h2>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Símbolo da Moeda</label>
+            <input id="cfg-moeda_simbolo" type="text" class="input-dark" placeholder="R$">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Taxa de Serviço (%)</label>
+            <input id="cfg-taxa_servico" type="number" class="input-dark" min="0" max="100" step="0.1">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Alerta de Estoque Mínimo</label>
+            <input id="cfg-estoque_minimo_alerta" type="number" class="input-dark">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="font-semibold text-base mb-4 border-b border-gray-700 pb-2">Impressão Térmica</h2>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Largura da Bobina</label>
+            <select id="cfg-impressora_largura" class="input-dark">
+              <option value="58">58mm (pequena)</option>
+              <option value="80">80mm (padrão)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt-6">
+      <h2 class="font-semibold text-base mb-4 border-b border-gray-700 pb-2">Alterar Minha Senha</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Senha Atual</label>
+          <input id="senha-atual" type="password" class="input-dark">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Nova Senha</label>
+          <input id="senha-nova" type="password" class="input-dark">
+        </div>
+        <div class="flex items-end">
+          <button onclick="alterarSenha()" class="btn btn-primary w-full justify-center">Alterar Senha</button>
+        </div>
+      </div>
+    </div>
+
+<div id="painel-assinatura"></div>
+
+  </main> <script>
+    async function init() {
+      await checkAuth();
+      const res = await API.get('/configuracoes.php');
+      
+      if (!res?.ok) {
+        if (res?.status === 403) toast('Sem permissão.', 'error');
+        return;
+      }
+
+      const cfg = res.data;
+      
+      const fields = [
+        'nome_empresa','cnpj','telefone','endereco','logo_url',
+        'pix_chave','pix_nome','pix_cidade','moeda_simbolo',
+        'taxa_servico','estoque_minimo_alerta','impressora_largura','tema'
+      ];
+
+      fields.forEach(f => {
+        const el = document.getElementById(`cfg-${f}`);
+        if (el) {
+          el.value = cfg[f] !== undefined ? cfg[f] : '';
+        }
+      });
+    }
+
+    async function saveConfig() {
+      const fields = ['nome_empresa','cnpj','telefone','endereco','logo_url',
+                      'pix_chave','pix_nome','pix_cidade','moeda_simbolo',
+                      'taxa_servico','estoque_minimo_alerta','impressora_largura','tema'];
+      const payload = {};
+      fields.forEach(f => {
+        const el = document.getElementById(`cfg-${f}`);
+        if (el) payload[f] = el.value;
+      });
+
+      const res = await API.post('/configuracoes.php', payload);
+      if (!res?.ok) { toast(res?.data?.error || 'Erro ao salvar.', 'error'); return; }
+      toast('Configurações salvas com sucesso!', 'success');
+      // Aplica o tema salvo imediatamente
+      const temaEl = document.getElementById('cfg-tema');
+      if (temaEl) applyTema(temaEl.value);
+      init();
+    }
+
+    async function alterarSenha() {
+      const atual = document.getElementById('senha-atual').value;
+      const nova  = document.getElementById('senha-nova').value;
+      if (!atual || !nova) { toast('Preencha os campos.', 'error'); return; }
+
+      const meRes = await API.get('/me.php');
+      if (!meRes?.ok) return;
+      const user = meRes.data.user;
+
+      const res = await API.put('/users.php', { id: user.id, nome: user.nome, email: user.email, perfil: user.perfil, ativo: 1, senha: nova });
+      if (!res?.ok) { toast(res?.data?.error || 'Erro ao alterar.', 'error'); return; }
+      
+      toast('Senha alterada! Relogando...', 'success');
+      setTimeout(() => logout(), 2000);
+    }
+
+    // previewTema: alias para applyTema (aplica visualmente sem salvar)
+    function previewTema(tema) {
+      if (typeof applyTema === 'function') applyTema(tema);
+    }
+
+    init();
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

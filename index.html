@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PDVo">
+  <link rel="apple-touch-icon" href="./assets/icons/icon.php?size=180">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDVo - Redirecionando...</title>
+  <script>
+    (async () => {
+      try {
+        const res = await fetch('./api/me.php', { credentials: 'same-origin' });
+        
+        if (res.ok) {
+          const json = await res.json();
+          // SALVA O PERFIL AQUI! Sem isso o sidebar.js não sabe que você é ADM
+          if (json.user) {
+            localStorage.setItem('user', JSON.stringify(json.user));
+          }
+          window.location.href = 'dashboard.html';
+        } else {
+          localStorage.removeItem('user');
+          window.location.href = 'login.html';
+        }
+      } catch (e) {
+        console.error(e);
+        window.location.href = 'login.html';
+      }
+    })();
+  </script>
+</head>
+<body style="background:#111827;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui">
+  <div style="text-align:center;color:#9ca3af">
+    <div style="font-size:3rem;font-weight:900;color:#3b82f6">PDVo</div>
+    <div style="margin-top:.5rem;font-size:.875rem">Carregando...</div>
+  </div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

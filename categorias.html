@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PDVo">
+  <link rel="apple-touch-icon" href="./assets/icons/icon.php?size=180">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDVo - Categorias</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./assets/css/pdv.css">
+</head>
+<body>
+  <script src="./assets/js/app.js"></script>
+  <script src="./assets/js/sidebar.js"></script>
+  <script>renderSidebar('categorias.html');</script>
+
+  <main class="main-content">
+    <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
+      <h1 class="text-2xl text-center font-bold">Categorias e Subcategorias</h1>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div>
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <h2 class="text-lg font-semibold">Categorias</h2>
+            <button onclick="loadCats()" class="p-1 hover:bg-gray-200 rounded-full transition-colors text-gray-500" title="Atualizar Categorias">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          </div>
+          <button onclick="openCatModal()" class="btn btn-primary btn-sm">+ Nova</button>
+        </div>
+        <div class="card">
+          <div id="cat-list" class="space-y-2">
+            <div class="spinner"></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <h2 class="text-lg font-semibold">Subcategorias</h2>
+            <button onclick="loadSubcats()" class="p-1 hover:bg-gray-200 rounded-full transition-colors text-gray-500" title="Atualizar Subcategorias">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          </div>
+          <button onclick="openSubModal()" class="btn btn-primary btn-sm">+ Nova</button>
+        </div>
+        <div class="card">
+          <select id="f-cat-sub" class="input-dark mb-3" onchange="loadSubcats()">
+            <option value="">Selecione uma Categoria</option>
+          </select>
+          <div id="sub-list" class="space-y-2">
+            <p class="text-gray-500 text-sm text-center py-4">Selecione uma categoria para ver as subcategorias.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<div id="painel-assinatura"></div>
+
+  </main>
+
+  <div id="modal-cat" class="modal-overlay hidden">
+    <div class="modal-box" style="max-width:420px">
+      <h3 class="modal-title" id="modal-cat-title">Nova Categoria</h3>
+      <div class="mb-3">
+        <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Nome *</label>
+        <input id="cat-nome" type="text" class="input-dark" required>
+      </div>
+      <div class="mb-4">
+        <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Descrição</label>
+        <textarea id="cat-desc" class="input-dark" rows="2"></textarea>
+      </div>
+      <input type="hidden" id="cat-id">
+      <div class="flex gap-2">
+        <button onclick="closeCatModal()" class="btn btn-ghost flex-1 justify-center">Cancelar</button>
+        <button onclick="saveCat()" class="btn btn-primary flex-1 justify-center">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-sub" class="modal-overlay hidden">
+    <div class="modal-box" style="max-width:420px">
+      <h3 class="modal-title" id="modal-sub-title">Nova Subcategoria</h3>
+      <div class="mb-3">
+        <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Categoria *</label>
+        <select id="sub-cat-id" class="input-dark"></select>
+      </div>
+      <div class="mb-3">
+        <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Nome *</label>
+        <input id="sub-nome" type="text" class="input-dark" required>
+      </div>
+      <input type="hidden" id="sub-id">
+      <div class="flex gap-2">
+        <button onclick="closeSubModal()" class="btn btn-ghost flex-1 justify-center">Cancelar</button>
+        <button onclick="saveSub()" class="btn btn-primary flex-1 justify-center">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let cats = [];
+
+    async function init() {
+      await checkAuth();
+      await loadCats();
+    }
+
+    async function loadCats() {
+      // Feedback visual de carregamento
+      document.getElementById('cat-list').innerHTML = '<div class="spinner"></div>';
+      
+      const res = await API.get('/categorias.php');
+      if (!res?.ok) return;
+      cats = res.data.categorias;
+      renderCats();
+      populateCatSelects();
+    }
+
+    function renderCats() {
+      const list = document.getElementById('cat-list');
+      if (!cats.length) { list.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Nenhuma categoria cadastrada.</p>'; return; }
+      
+      list.innerHTML = cats.map(c => `
+        <div class="flex items-center justify-between p-3 rounded-lg border" 
+             style="background: var(--bg-secondary); border-color: var(--border);">
+          <div>
+            <div class="font-medium">${c.nome}</div>
+            <div class="text-xs opacity-60">${c.total_produtos} produto(s)</div>
+          </div>
+          <div class="flex gap-1">
+            <button onclick="editCat(${JSON.stringify(c).replace(/"/g,'&quot;')})" class="btn btn-ghost btn-sm">Editar</button>
+            <button onclick="deleteCat(${c.id})" class="btn btn-danger btn-sm">×</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function populateCatSelects() {
+      const selFilter = document.getElementById('f-cat-sub');
+      const selModal  = document.getElementById('sub-cat-id');
+      const currentVal = selFilter.value; // Salva o valor atual para não perder o filtro
+      const opts = cats.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+      selFilter.innerHTML = '<option value="">Selecione uma Categoria</option>' + opts;
+      selModal.innerHTML  = opts;
+      selFilter.value = currentVal; // Restaura o filtro
+    }
+
+    async function loadSubcats() {
+      const catId = document.getElementById('f-cat-sub').value;
+      const list  = document.getElementById('sub-list');
+      if (!catId) { list.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Selecione uma categoria.</p>'; return; }
+      
+      list.innerHTML = '<div class="spinner"></div>';
+      
+      const res = await API.get(`/categorias.php?subcategorias=1&categoria_id=${catId}`);
+      if (!res?.ok) return;
+      const subs = res.data.subcategorias;
+      if (!subs.length) { list.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Nenhuma subcategoria.</p>'; return; }
+      
+      list.innerHTML = subs.map(s => `
+        <div class="flex items-center justify-between p-3 rounded-lg border" 
+             style="background: var(--bg-secondary); border-color: var(--border);">
+          <span class="font-medium">${s.nome}</span>
+          <div class="flex gap-1">
+            <button onclick="editSub(${JSON.stringify(s).replace(/"/g,'&quot;')})" class="btn btn-ghost btn-sm">Editar</button>
+            <button onclick="deleteSub(${s.id})" class="btn btn-danger btn-sm">×</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Modal helpers
+    function openCatModal(cat = null) {
+      document.getElementById('modal-cat').classList.remove('hidden');
+      document.getElementById('cat-id').value   = cat?.id || '';
+      document.getElementById('cat-nome').value = cat?.nome || '';
+      document.getElementById('cat-desc').value = cat?.descricao || '';
+      document.getElementById('modal-cat-title').textContent = cat ? 'Editar Categoria' : 'Nova Categoria';
+    }
+    function closeCatModal() { document.getElementById('modal-cat').classList.add('hidden'); }
+    function editCat(c) { openCatModal(c); }
+
+    async function saveCat() {
+      const id   = document.getElementById('cat-id').value;
+      const nome = document.getElementById('cat-nome').value.trim();
+      if (!nome) { toast('Nome é obrigatório.', 'error'); return; }
+      const payload = { nome, descricao: document.getElementById('cat-desc').value };
+      if (id) payload.id = parseInt(id);
+      const res = id ? await API.put('/categorias.php', payload) : await API.post('/categorias.php', payload);
+      if (!res?.ok) { toast(res?.data?.error || 'Erro.', 'error'); return; }
+      toast(res.data.message, 'success');
+      closeCatModal();
+      loadCats();
+    }
+
+    async function deleteCat(id) {
+      if (!window.confirm('Desativar esta categoria?')) return;
+      const res = await API.delete(`/categorias.php?id=${id}&tipo=categoria`);
+      if (!res?.ok) { toast(res?.data?.error || 'Erro.', 'error'); return; }
+      toast(res.data.message, 'success');
+      loadCats();
+    }
+
+    function openSubModal(sub = null) {
+      document.getElementById('modal-sub').classList.remove('hidden');
+      document.getElementById('sub-id').value     = sub?.id || '';
+      document.getElementById('sub-nome').value   = sub?.nome || '';
+      document.getElementById('modal-sub-title').textContent = sub ? 'Editar Subcategoria' : 'Nova Subcategoria';
+      if (sub) document.getElementById('sub-cat-id').value = sub.categoria_id;
+    }
+    function closeSubModal() { document.getElementById('modal-sub').classList.add('hidden'); }
+    function editSub(s) { openSubModal(s); }
+
+    async function saveSub() {
+      const id    = document.getElementById('sub-id').value;
+      const nome  = document.getElementById('sub-nome').value.trim();
+      const catId = document.getElementById('sub-cat-id').value;
+      if (!nome || !catId) { toast('Categoria e nome são obrigatórios.', 'error'); return; }
+      const payload = { nome, categoria_id: parseInt(catId), subcategoria: true };
+      if (id) payload.id = parseInt(id);
+      const res = id ? await API.put('/categorias.php', payload) : await API.post('/categorias.php', payload);
+      if (!res?.ok) { toast(res?.data?.error || 'Erro.', 'error'); return; }
+      toast(res.data.message, 'success');
+      closeSubModal();
+      loadSubcats();
+    }
+
+    async function deleteSub(id) {
+      if (!window.confirm('Desativar esta subcategoria?')) return;
+      const res = await API.delete(`/categorias.php?id=${id}&tipo=subcategoria`);
+      if (!res?.ok) { toast(res?.data?.error || 'Erro.', 'error'); return; }
+      toast(res.data.message, 'success');
+      loadSubcats();
+    }
+
+    init();
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

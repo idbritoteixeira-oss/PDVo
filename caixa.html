@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PDVo">
+  <link rel="apple-touch-icon" href="./assets/icons/icon.php?size=180">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>PDVo - Caixa / PDV</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
+  <link rel="stylesheet" href="./assets/css/pdv.css">
+</head>
+<body>
+  <script src="./assets/js/app.js"></script>
+  <script src="./assets/js/sidebar.js"></script>
+  <script>renderSidebar('caixa.html');</script>
+
+  <main class="main-content" style="padding-bottom:80px">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h1 class="text-2xl text-center font-bold">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Caixa / PDV</h1>
+        <p id="caixa-info" class="text-xs text-center opacity-70">Verificando caixa...</p>
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        <button id="btn-fechar-caixa" onclick="fecharCaixa()" class="btn btn-danger btn-sm hidden">Fechar Caixa</button>
+        <button id="btn-abrir-caixa" onclick="showAbrirCaixaModal()" class="btn btn-success btn-sm">Abrir Caixa</button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      <div class="lg:col-span-3 space-y-3">
+        <div class="card">
+          <div class="flex gap-2 mb-2">
+            <div class="relative flex-1">
+              <input id="search-input" type="text" class="input-dark pl-9 text-slate-900"
+                     placeholder="Buscar produto por nome ou código de barras...">
+              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 opacity-70" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+              </svg>
+            </div>
+            <button onclick="toggleScanner()" title="Scanner de Câmera"
+                    class="btn btn-ghost btn-sm px-3" id="btn-scanner">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9V5a2 2 0 012-2h4M3 15v4a2 2 0 002 2h4m10-14h-4m4 0v4m0 10h-4m4 0v-4M9 9h6v6H9z"/>
+              </svg>
+            </button>
+          </div>
+          
+          <div id="search-results" class="hidden rounded-lg max-h-64 overflow-y-auto border shadow-2xl z-50 text-slate-900" 
+               style="background: #ffffff; border-color: var(--border); margin-top: 4px;"></div>
+          
+          <div id="scanner-container" class="hidden mt-2">
+            <div id="scanner-reader" class="rounded-lg overflow-hidden"></div>
+            <button onclick="stopScanner()" class="btn btn-danger btn-sm mt-2 w-full">Parar Scanner</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold text-sm">Itens do Carrinho</h2>
+            <button onclick="clearCart()" class="text-xs text-red-500 hover:underline">Limpar tudo</button>
+          </div>
+          <div id="cart-items" class="space-y-2 min-h-24"></div>
+          <p id="cart-empty" class="text-center opacity-70 text-sm py-8">
+            Nenhum produto adicionado.<br>
+            <span class="text-xs">Busque ou escaneie um produto acima.</span>
+          </p>
+        </div>
+
+        <div id="receipt" style="display:none"></div>
+        <span id="empresa-nome" class="hidden"></span>
+      </div>
+
+      <div class="lg:col-span-2 space-y-3">
+        <div class="card sticky top-4">
+          <h2 class="font-semibold mb-4 text-base">Resumo</h2>
+
+          <div class="flex justify-between text-sm mb-2">
+            <span class="opacity-70">Subtotal:</span>
+            <span id="subtotal" class="font-semibold">R$ 0,00</span>
+          </div>
+
+          <div class="flex items-center gap-2 mb-3">
+            <label class="text-sm opacity-70 whitespace-nowrap">Desconto (R$):</label>
+            <input id="desconto" type="number" class="input-dark text-right text-slate-900" value="0" min="0" step="0.01"
+                   oninput="renderCart()" placeholder="0,00">
+          </div>
+
+          <div class="border-t pt-3 mb-4" style="border-color: var(--border)">
+            <div class="flex justify-between text-lg font-black">
+              <span>TOTAL:</span>
+              <span id="total-value" style="color: var(--blue-royal)">R$ 0,00</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <button onclick="openPaymentModal()" class="btn btn-success py-3 justify-center text-base">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+              </svg>
+              Finalizar
+            </button>
+            <button onclick="gerarPixQR()" class="btn btn-ghost py-3 justify-center text-base">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm2 2V5h1v1H5zM3 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zm2 2v-1h1v1H5zM13 3a1 1 0 00-1 1v3a1 1 0 001 1h3a1 1 0 001-1V4a1 1 0 00-1-1h-3zm1 2v1h1V5h-1z" clip-rule="evenodd"/>
+                <path d="M11 4a1 1 0 10-2 0v1a1 1 0 002 0V4zM10 7a1 1 0 011 1v1h2a1 1 0 110 2h-3a1 1 0 01-1-1V8a1 1 0 011-1zM16 9a1 1 0 100 2 1 1 0 000-2zM9 13a1 1 0 011-1h1a1 1 0 110 2v2a1 1 0 11-2 0v-3zM15 13a1 1 0 10-2 0v3a1 1 0 102 0v-3zM11 19a1 1 0 100-2h-1a1 1 0 100 2h1z"/>
+              </svg>
+              PIX QR
+            </button>
+          </div>
+
+          <a href="/vendas.html" class="btn btn-ghost btn-sm w-full justify-center text-xs">Ver histórico de vendas</a>
+        </div>
+      </div>
+    </div>
+
+<div id="painel-assinatura"></div>
+
+  </main>
+
+  <div id="modal-caixa" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h3 class="modal-title">Abrir Caixa</h3>
+      <p class="opacity-60 text-sm mb-4">Informe o saldo inicial em dinheiro para abrir o caixa.</p>
+      <label class="block text-xs opacity-60 mb-1 uppercase font-semibold">Saldo de Abertura (R$)</label>
+      <input id="saldo-abertura" type="number" class="input-dark mb-4 text-slate-900" value="0" min="0" step="0.01">
+      <div class="flex gap-2">
+        <button onclick="abrirCaixa()" class="btn btn-success flex-1 justify-center">Abrir Caixa</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-pagamento" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h3 class="modal-title">Finalizar Venda</h3>
+      <div class="flex justify-between items-center mb-4 rounded-lg p-4 border" 
+           style="background: var(--bg-secondary); border-color: var(--blue-royal);">
+        <span class="opacity-70 font-medium text-slate-700">Total a Pagar</span>
+        <span id="pay-total" class="text-2xl font-black" style="color: var(--blue-royal)">R$ 0,00</span>
+      </div>
+
+      <div class="mb-3">
+        <label class="block text-xs opacity-60 mb-1 uppercase font-semibold">Forma de Pagamento</label>
+        <select id="forma-pagamento" class="input-dark text-slate-900">
+          <option value="dinheiro">💵 Dinheiro</option>
+          <option value="cartao_credito">💳 Cartão de Crédito</option>
+          <option value="cartao_debito">💳 Cartão de Débito</option>
+          <option value="pix">📱 PIX</option>
+          <option value="fiado">📋 Fiado</option>
+          <option value="misto">🔀 Misto</option>
+        </select>
+      </div>
+
+      <div id="troco-container" class="mb-4">
+        <label class="block text-xs opacity-60 mb-1 uppercase font-semibold">Valor Recebido (R$)</label>
+        <input id="valor-pago" type="number" class="input-dark mb-2 text-lg font-bold text-slate-900" step="0.01" min="0">
+        <div class="flex justify-between items-center rounded-lg p-3 border" style="background: var(--bg-primary); border-color: var(--border);">
+          <span class="opacity-60 font-medium">Troco:</span>
+          <span id="troco" class="font-bold text-xl text-slate-700">R$ 0,00</span>
+        </div>
+      </div>
+
+      <div class="flex gap-2">
+        <button onclick="closePaymentModal()" class="btn btn-ghost flex-1 justify-center">Cancelar</button>
+        <button id="btn-finalizar" onclick="finalizarVenda()" class="btn btn-success flex-1 justify-center text-base">
+          Confirmar Venda
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-pix" class="modal-overlay hidden">
+    <div class="modal-box text-center">
+      <h3 class="modal-title">Pagamento via PIX</h3>
+      <div id="qr-container" class="flex justify-center mb-4 p-2 bg-white rounded-lg"></div>
+      <label class="block text-xs opacity-60 mb-1">Copie o código PIX:</label>
+      <div class="flex gap-2 mb-4">
+        <input id="pix-payload" type="text" class="input-dark text-xs text-slate-900" readonly>
+        <button onclick="copyPixPayload()" class="btn btn-primary btn-sm whitespace-nowrap">Copiar</button>
+      </div>
+      <button onclick="document.getElementById('modal-pix').classList.add('hidden')" class="btn btn-ghost w-full justify-center">Fechar</button>
+    </div>
+  </div>
+
+  <script src="./assets/js/pdv.js"></script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

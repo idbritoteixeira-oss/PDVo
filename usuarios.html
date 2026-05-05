@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PDVo">
+  <link rel="apple-touch-icon" href="./assets/icons/icon.php?size=180">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDVo - Usuários</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./assets/css/pdv.css">
+</head>
+<body>
+  <script src="./assets/js/app.js"></script>
+  <script src="./assets/js/sidebar.js"></script>
+  <script>renderSidebar('usuarios.html');</script>
+
+  <main class="main-content">
+    <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
+      <div>
+        <h1 class="text-2xl text-center font-bold">&nbsp;&nbsp;&nbsp;Gerenciar Usuários</h1>
+        <p class="text-gray-400 text-center text-sm">&nbsp;&nbsp;&nbsp;Apenas administradores podem acessar.</p>
+      </div>
+      <button onclick="openModal()" class="btn btn-primary">+ Novo</button>
+    </div>
+
+    <div class="card">
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>E-mail</th>
+              <th>Perfil</th>
+              <th>Último Login</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="users-body">
+            <tr><td colspan="6" class="text-center py-6 text-gray-500">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+<div id="painel-assinatura"></div>
+
+  </main>
+
+  <div id="modal-user" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h3 class="modal-title" id="modal-title">Novo Usuário</h3>
+      <div class="space-y-3">
+        <input type="hidden" id="u-id">
+
+        <div>
+          <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Nome Completo *</label>
+          <input id="u-nome" type="text" class="input-dark" placeholder="Nome do usuário">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">E-mail *</label>
+          <input id="u-email" type="email" class="input-dark" placeholder="email@empresa.com">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Senha <span id="senha-hint" class="text-gray-500 normal-case font-normal">(mín. 6 caracteres)</span></label>
+          <input id="u-senha" type="password" class="input-dark" placeholder="••••••">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Perfil de Acesso</label>
+          <select id="u-perfil" class="input-dark">
+            <option value="operador">Operador — Apenas PDV e vendas</option>
+            <option value="gerente">Gerente — Produtos, estoque e relatórios</option>
+          </select>
+        </div>
+        <div id="u-ativo-wrapper" class="hidden">
+          <label class="flex items-center gap-2 cursor-pointer text-sm">
+            <input id="u-ativo" type="checkbox" checked class="w-4 h-4"> Usuário ativo
+          </label>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button onclick="closeModal()" class="btn btn-ghost flex-1 justify-center">Cancelar</button>
+          <button onclick="saveUser()" class="btn btn-primary flex-1 justify-center">Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const perfilLabel = { admin: 'Administrador', gerente: 'Gerente', operador: 'Operador' };
+    const perfilClass = { admin: 'badge-danger', gerente: 'badge-warning', operador: 'badge-info' };
+
+    async function init() {
+      await checkAuth();
+      await loadUsers();
+    }
+
+    async function loadUsers() {
+      const res = await API.get('/users.php');
+      if (!res?.ok) {
+        document.getElementById('users-body').innerHTML = `<tr><td colspan="6" class="text-center py-6 text-red-400">${res?.data?.error || 'Sem permissão.'}</td></tr>`;
+        return;
+      }
+      const tbody = document.getElementById('users-body');
+      if (!res.data.users.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-gray-500">Nenhum usuário.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = res.data.users.map(u => `
+        <tr>
+          <td class="font-medium">${u.nome}</td>
+          <td class="text-gray-600 text-sm">${u.email}</td>
+          <td><span class="badge ${perfilClass[u.perfil]}">${perfilLabel[u.perfil]}</span></td>
+          <td class="text-gray-600 text-sm">${u.ultimo_login ? new Date(u.ultimo_login).toLocaleString('pt-BR') : 'Nunca'}</td>
+          <td><span class="badge ${u.ativo ? 'badge-success' : 'badge-danger'}">${u.ativo ? 'Ativo' : 'Inativo'}</span></td>
+          <td>
+            <div class="flex gap-1">
+              <button onclick="editUser(${JSON.stringify(u).replace(/"/g,'&quot;')})" class="btn btn-ghost btn-sm">Editar</button>
+              <button onclick="deleteUser(${u.id})" class="btn btn-danger btn-sm">Desativar</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function openModal(u = null) {
+      document.getElementById('modal-user').classList.remove('hidden');
+      document.getElementById('u-id').value    = u?.id || '';
+      document.getElementById('u-nome').value  = u?.nome || '';
+      document.getElementById('u-email').value = u?.email || '';
+      document.getElementById('u-senha').value = '';
+      document.getElementById('u-perfil').value = u?.perfil || 'operador';
+      document.getElementById('modal-title').textContent = u ? 'Editar Usuário' : 'Novo Usuário';
+      document.getElementById('u-ativo-wrapper').classList.toggle('hidden', !u);
+      document.getElementById('senha-hint').textContent = u ? '(deixe em branco para não alterar)' : '(mín. 6 caracteres)';
+      if (u) document.getElementById('u-ativo').checked = !!u.ativo;
+    }
+
+    function editUser(u) { openModal(u); }
+    function closeModal() { document.getElementById('modal-user').classList.add('hidden'); }
+
+    async function saveUser() {
+      const id    = document.getElementById('u-id').value;
+      const nome  = document.getElementById('u-nome').value.trim();
+      const email = document.getElementById('u-email').value.trim();
+      const senha = document.getElementById('u-senha').value;
+      const perfil= document.getElementById('u-perfil').value;
+
+      if (!nome || !email) { toast('Nome e e-mail são obrigatórios.', 'error'); return; }
+      if (!id && !senha) { toast('Senha é obrigatória para novo usuário.', 'error'); return; }
+
+      const payload = { nome, email, perfil };
+      if (id) {
+        payload.id    = parseInt(id);
+        payload.ativo = document.getElementById('u-ativo').checked ? 1 : 0;
+      }
+      if (senha) payload.senha = senha;
+
+      const res = id ? await API.put('/users.php', payload) : await API.post('/users.php', payload);
+      
+      // LOGICA DE ERRO ATUALIZADA PARA MOSTRAR TRAVAS DE RANK DE USUARIOS
+      if (!res?.ok) { 
+        let msgErro = res?.data?.error || 'Erro ao salvar.';
+        if (res?.data?.suggestion) {
+            msgErro += "\n\n💡 " + res.data.suggestion;
+        }
+        toast(msgErro, 'error'); 
+        return; 
+      }
+      
+      toast(res.data.message, 'success');
+      closeModal();
+      loadUsers();
+    }
+
+    async function deleteUser(id) {
+      if (!window.confirm('Desativar este usuário?')) return;
+      const res = await API.delete(`/users.php?id=${id}`);
+      if (!res?.ok) { toast(res?.data?.error || 'Erro.', 'error'); return; }
+      toast(res.data.message, 'success');
+      loadUsers();
+    }
+
+    init();
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

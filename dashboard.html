@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PDVo">
+  <link rel="apple-touch-icon" href="./assets/icons/icon.php?size=180">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDVo - Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="./assets/css/pdv.css">
+</head>
+<body>
+  <script src="./assets/js/app.js"></script>
+  <script src="./assets/js/sidebar.js"></script>
+
+  <main class="main-content">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl text-center font-bold">Dashboard</h1>
+        <p class="text-gray-500 text-sm" id="data-atual"></p>
+      </div>
+      <a href="caixa.html" class="btn btn-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/>
+          <path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/>
+        </svg>
+        Abrir PDV
+      </a>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="card text-center">
+        <p class="text-gray-400 text-xs uppercase tracking-wide font-semibold mb-1">Vendas Hoje</p>
+        <p id="kpi-hoje-valor" class="text-2xl font-black text-blue-400">--</p>
+        <p id="kpi-hoje-qtd" class="text-xs text-gray-400 mt-0.5">-- transações</p>
+      </div>
+      <div class="card text-center">
+        <p class="text-gray-400 text-xs uppercase tracking-wide font-semibold mb-1">Vendas do Mês</p>
+        <p id="kpi-mes-valor" class="text-2xl font-black text-green-400">--</p>
+        <p id="kpi-mes-qtd" class="text-xs text-gray-400 mt-0.5">-- transações</p>
+      </div>
+      <div class="card text-center">
+        <p class="text-gray-400 text-xs uppercase tracking-wide font-semibold mb-1">Total Produtos</p>
+        <p id="kpi-produtos" class="text-2xl font-black text-blue-700">--</p>
+        <p class="text-xs text-gray-400 mt-0.5">ativos no sistema</p>
+      </div>
+      <div class="card text-center">
+        <p class="text-gray-400 text-xs uppercase tracking-wide font-semibold mb-1">Estoque Baixo</p>
+        <p id="kpi-estoque-baixo" class="text-2xl font-black text-red-500">--</p>
+        <p class="text-xs text-gray-400 mt-0.5">produtos abaixo do mínimo</p>
+      </div>
+    </div>
+
+    <div id="caixa-alert" class="hidden card mb-6 border-l-4 border-l-green-500">
+      <div class="flex items-center gap-3">
+        <div class="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+        <div>
+          <p class="font-semibold text-sm">Caixa Aberto</p>
+          <p id="caixa-info" class="text-xs text-gray-600"></p>
+        </div>
+        <a href="caixa.html" class="ml-auto btn btn-primary btn-sm">Ir ao PDV</a>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div class="card">
+        <h2 class="font-semibold mb-3 text-sm text-gray-600">Vendas dos Últimos 7 Dias</h2>
+        <div class="chart-container">
+          <canvas id="chart-diario"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h2 class="font-semibold mb-3 text-sm text-gray-600">Vendas Mensais (12 meses)</h2>
+        <div class="chart-container">
+          <canvas id="chart-mensal"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="card">
+        <h2 class="font-semibold mb-3 text-sm text-gray-600">Formas de Pagamento (Mês)</h2>
+        <div class="chart-container" style="height:180px">
+          <canvas id="chart-pagamentos"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-semibold text-sm text-gray-600">Alerta de Estoque Baixo</h2>
+          <a href="estoque.html" class="text-xs text-blue-400 hover:underline">Ver todos</a>
+        </div>
+        <div id="estoque-baixo-list" class="space-y-2">
+          <p class="text-gray-500 text-sm">Carregando...</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt-6">
+      <h2 class="font-semibold mb-3 text-sm text-gray-600">Produtos Mais Vendidos (Mês)</h2>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Produto</th>
+              <th>Qtd Vendida</th>
+              <th>Total (R$)</th>
+            </tr>
+          </thead>
+          <tbody id="top-produtos-body">
+            <tr><td colspan="4" class="text-center text-gray-500 py-4">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+<div id="painel-assinatura"></div>
+          
+  </main>
+
+  <script>
+    let chartDiario, chartMensal, chartPagamentos;
+
+    document.getElementById('data-atual').textContent =
+      new Date().toLocaleDateString('pt-BR', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+    async function init() {
+      const user = await checkAuth();
+      if (!user) return;
+
+      renderSidebar('dashboard.html');
+      await loadDashboard();
+
+      setInterval(() => {
+        updateDashboardData();
+      }, 5000);
+    }
+
+    async function loadDashboard() {
+      const res = await API.get('/dashboard.php');
+      if (!res?.ok) { toast('Erro ao carregar dashboard.', 'error'); return; }
+      const d = res.data;
+
+      updateUI(d);
+      renderCharts(d);
+    }
+
+    async function updateDashboardData() {
+      const res = await API.get('/dashboard.php');
+      if (res?.ok) {
+        updateUI(res.data);
+      }
+    }
+
+    function updateUI(d) {
+      document.getElementById('kpi-hoje-valor').textContent  = formatCurrency(d.hoje.total_valor);
+      document.getElementById('kpi-hoje-qtd').textContent    = `${d.hoje.total_vendas} transações`;
+      document.getElementById('kpi-mes-valor').textContent   = formatCurrency(d.mes.total_valor);
+      document.getElementById('kpi-mes-qtd').textContent     = `${d.mes.total_vendas} transações`;
+      document.getElementById('kpi-produtos').textContent    = d.total_produtos;
+      document.getElementById('kpi-estoque-baixo').textContent = d.estoque_baixo.length;
+
+      if (d.caixa_aberto) {
+        const el = document.getElementById('caixa-alert');
+        el.classList.remove('hidden');
+        document.getElementById('caixa-info').textContent =
+          `Operador: ${d.caixa_aberto.operador} | Total: ${formatCurrency(d.caixa_aberto.total_vendas)}`;
+      }
+
+      const est = document.getElementById('estoque-baixo-list');
+      if (!d.estoque_baixo.length) {
+        est.innerHTML = '<p class="text-green-500 text-sm">✓ Estoque adequado.</p>';
+      } else {
+        est.innerHTML = d.estoque_baixo.map(p => `
+          <div class="flex items-center justify-between p-2 rounded-lg bg-red-900/10 border border-red-800/30">
+            <span class="text-sm font-medium truncate flex-1">${p.nome}</span>
+            <span class="text-red-400 font-bold text-sm ml-2">${formatNum(p.estoque)} ${p.unidade}</span>
+          </div>`).join('');
+      }
+
+      const tbody = document.getElementById('top-produtos-body');
+      if (!d.top_produtos.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-4">Nenhuma venda.</td></tr>';
+      } else {
+        tbody.innerHTML = d.top_produtos.map((p, i) => `
+          <tr>
+            <td class="text-gray-400">${i + 1}</td>
+            <td class="font-medium">${p.nome}</td>
+            <td>${formatNum(p.total_qtd)}</td>
+            <td class="text-green-400 font-semibold">${formatCurrency(p.total_valor)}</td>
+          </tr>`).join('');
+      }
+    }
+
+    // --- GRÁFICOS MELHORADOS ---
+    function renderCharts(d) {
+      // 1. Gráfico Diário com Cálculo de Porcentagem
+      const labels7 = d.grafico_diario.map(r => new Date(r.data + 'T00:00:00').toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit'}));
+      const vals7   = d.grafico_diario.map(r => parseFloat(r.total));
+      
+      // Cálculo do crescimento em relação ao dia anterior (para o Tooltip)
+      const growth = vals7.map((val, i) => {
+        if (i === 0 || vals7[i-1] === 0) return null;
+        const diff = ((val - vals7[i-1]) / vals7[i-1]) * 100;
+        return diff.toFixed(1);
+      });
+
+      renderLine('chart-diario', labels7, vals7, 'Vendas R$', growth);
+
+      // 2. Gráfico Mensal
+      const labelsM = d.grafico_mensal.map(r => { const [y,m] = r.mes.split('-'); return `${m}/${y.slice(2)}`; });
+      const valsM   = d.grafico_mensal.map(r => parseFloat(r.total));
+      renderBar('chart-mensal', labelsM, valsM, 'Faturamento Mensal');
+
+      // 3. Formas de Pagamento
+      const labPag = d.formas_pagamento.map(r => r.forma_pagamento.replace('_', ' '));
+      const valPag = d.formas_pagamento.map(r => parseFloat(r.total));
+      renderDoughnut('chart-pagamentos', labPag, valPag);
+    }
+
+    function chartDefaults() {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { intersect: false, mode: 'index' },
+        plugins: { 
+          legend: { display: false }, // Escondemos a legenda padrão para ficar mais limpo
+          tooltip: {
+            backgroundColor: '#1f2937',
+            titleFont: { size: 13 },
+            bodyFont: { size: 12 },
+            padding: 10,
+            displayColors: false
+          }
+        },
+        scales: {
+          x: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { display: false } },
+          y: { 
+            ticks: { color: '#9ca3af', font: { size: 10 }, callback: v => 'R$ ' + v.toFixed(0) },
+            grid: { color: 'rgba(75, 85, 99, 0.2)', borderDash: [5, 5] } 
+          },
+        },
+      };
+    }
+
+    function renderLine(id, labels, data, label, growth) {
+      const ctx = document.getElementById(id).getContext('2d');
+      const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+      gradient.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
+      gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
+      if (chartDiario) chartDiario.destroy();
+      chartDiario = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{ 
+            label, 
+            data, 
+            borderColor: '#3b82f6', 
+            borderWidth: 3,
+            backgroundColor: gradient, 
+            fill: true, 
+            tension: 0.4, 
+            pointRadius: 0,
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: '#3b82f6'
+          }],
+        },
+        options: {
+          ...chartDefaults(),
+          plugins: {
+            ...chartDefaults().plugins,
+            tooltip: {
+              ...chartDefaults().plugins.tooltip,
+              callbacks: {
+                label: (context) => {
+                  let text = `Faturado: ${formatCurrency(context.parsed.y)}`;
+                  const g = growth[context.dataIndex];
+                  if (g !== null) {
+                    const icon = g >= 0 ? '▲' : '▼';
+                    text += ` (${icon} ${g}%)`;
+                  }
+                  return text;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function renderBar(id, labels, data, label) {
+      const ctx = document.getElementById(id).getContext('2d');
+      const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+      gradient.addColorStop(0, '#10b981');
+      gradient.addColorStop(1, '#064e3b');
+
+      if (chartMensal) chartMensal.destroy();
+      chartMensal = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{ 
+            label, 
+            data, 
+            backgroundColor: gradient, 
+            borderRadius: 6,
+            barPercentage: 0.6 
+          }],
+        },
+        options: chartDefaults()
+      });
+    }
+
+    function renderDoughnut(id, labels, data) {
+      const ctx = document.getElementById(id).getContext('2d');
+      if (chartPagamentos) chartPagamentos.destroy();
+      chartPagamentos = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{ 
+            data, 
+            backgroundColor: ['#3b82f6','#10b981','#8b5cf6','#f59e0b','#ef4444','#06b6d4'], 
+            borderWidth: 2,
+            borderColor: '#111827', // Cor de fundo do card para separar as fatias
+            hoverOffset: 10
+          }],
+        },
+        options: {
+          responsive: true, 
+          maintainAspectRatio: false,
+          cutout: '70%',
+          plugins: { 
+            legend: { 
+              position: 'right', 
+              labels: { color: '#9ca3af', font: { size: 11 }, padding: 15, usePointStyle: true } 
+            } 
+          },
+        },
+      });
+    }
+
+    init();
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

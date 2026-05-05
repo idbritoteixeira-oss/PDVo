@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PDVo">
+  <link rel="apple-touch-icon" href="./assets/icons/icon.php?size=180">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDVo - Relatórios</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="./assets/css/pdv.css">
+  <style>
+    .rel-tab { cursor:pointer; padding:.5rem 1.1rem; border-radius:.75rem; font-size:.75rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; border:1px solid transparent; transition:all .18s; }
+    .rel-tab.active { background:var(--accent,#2563eb); color:#fff; border-color:var(--accent,#2563eb); }
+    .rel-tab:not(.active) { border-color:rgba(255,255,255,.08); color:var(--text-muted,#94a3b8); }
+    .rel-tab:not(.active):hover { border-color:rgba(255,255,255,.18); color:var(--text-primary,#f1f5f9); }
+    .stat-box { background:var(--card-bg,#1e293b); border:1px solid var(--border,rgba(255,255,255,.08)); border-radius:1rem; padding:1.25rem 1.5rem; }
+    .stat-box .lbl { font-size:.65rem; font-weight:800; text-transform:uppercase; letter-spacing:.1em; color:var(--text-muted,#94a3b8); margin-bottom:.4rem; }
+    .stat-box .val { font-size:1.75rem; font-weight:900; color:var(--text-primary,#f1f5f9); line-height:1; }
+    .stat-box .sub { font-size:.7rem; color:var(--text-subtle,#64748b); margin-top:.3rem; }
+    #chart-vendas-container { position:relative; height:220px; }
+    .export-btn { display:inline-flex; align-items:center; gap:.4rem; padding:.5rem 1.2rem; border-radius:.75rem; font-size:.75rem; font-weight:700; cursor:pointer; border:1px solid; transition:all .18s; }
+    .export-pdf  { background:rgba(239,68,68,.1); border-color:rgba(239,68,68,.25); color:#f87171; }
+    .export-pdf:hover  { background:rgba(239,68,68,.2); }
+    .export-xml  { background:rgba(34,197,94,.1); border-color:rgba(34,197,94,.25); color:#4ade80; }
+    .export-xml:hover  { background:rgba(34,197,94,.2); }
+    .export-csv  { background:rgba(59,130,246,.1); border-color:rgba(59,130,246,.25); color:#60a5fa; }
+    .export-csv:hover  { background:rgba(59,130,246,.2); }
+    @media print {
+      .no-print { display:none !important; }
+      .print-area { padding:0 !important; }
+      body { background:#fff !important; color:#000 !important; }
+      .stat-box { background:#f8fafc !important; border:1px solid #e2e8f0 !important; color:#000 !important; }
+      .stat-box .val { color:#111 !important; }
+      .card { background:#fff !important; border:1px solid #e2e8f0 !important; }
+      table { border-collapse:collapse; }
+      th, td { border:1px solid #e2e8f0 !important; color:#000 !important; }
+    }
+  </style>
+</head>
+<body>
+  <script src="./assets/js/app.js"></script>
+  <script src="./assets/js/sidebar.js"></script>
+  <script>renderSidebar('relatorios.html');</script>
+
+  <main class="main-content print-area">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-5 flex-wrap gap-3 no-print">
+      <h1 class="text-2xl font-bold">Relatórios</h1>
+      <div class="flex gap-2 flex-wrap">
+        <button onclick="exportarPDF()" class="export-btn export-pdf">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+          Exportar PDF
+        </button>
+        <button onclick="exportarXML()" class="export-btn export-xml">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+          Exportar XML
+        </button>
+        <button onclick="exportarCSV()" class="export-btn export-csv">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Exportar CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex gap-2 mb-5 flex-wrap no-print">
+      <button class="rel-tab active" id="tab-vendas"   onclick="switchTab('vendas')">📊 Vendas</button>
+      <button class="rel-tab"        id="tab-produtos"  onclick="switchTab('produtos')">📦 Produtos</button>
+      <button class="rel-tab"        id="tab-caixa"     onclick="switchTab('caixa')">💰 Caixa</button>
+      <button class="rel-tab"        id="tab-estoque"   onclick="switchTab('estoque')">🏭 Estoque</button>
+    </div>
+
+    <!-- Filtros de período -->
+    <div class="card mb-5 no-print">
+      <div class="flex flex-wrap gap-3 items-end">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Data Início</label>
+          <input type="date" id="f-de" class="input-dark" onchange="carregarAba()">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1 uppercase font-semibold">Data Fim</label>
+          <input type="date" id="f-ate" class="input-dark" onchange="carregarAba()">
+        </div>
+        <div class="flex gap-2">
+          <button onclick="setRange('hoje')"    class="btn btn-ghost btn-sm">Hoje</button>
+          <button onclick="setRange('semana')"  class="btn btn-ghost btn-sm">7 dias</button>
+          <button onclick="setRange('mes')"     class="btn btn-ghost btn-sm">Este mês</button>
+          <button onclick="setRange('mes_ant')" class="btn btn-ghost btn-sm">Mês ant.</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ABA: VENDAS ===== -->
+    <div id="panel-vendas">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5" id="stats-vendas">
+        <div class="stat-box"><div class="lbl">Total Vendas</div><div class="val" id="s-total-v">—</div><div class="sub" id="s-dias-v"></div></div>
+        <div class="stat-box"><div class="lbl">Receita</div><div class="val text-green-400" id="s-receita">—</div><div class="sub">total no período</div></div>
+        <div class="stat-box"><div class="lbl">Ticket Médio</div><div class="val text-blue-400" id="s-ticket">—</div><div class="sub">por venda</div></div>
+        <div class="stat-box"><div class="lbl">Descontos</div><div class="val text-red-400" id="s-descontos">—</div><div class="sub">total concedido</div></div>
+      </div>
+
+      <div class="card mb-5">
+        <h2 class="font-semibold mb-3 text-sm">Vendas por Dia</h2>
+        <div id="chart-vendas-container"><canvas id="chart-vendas"></canvas></div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+        <div class="card">
+          <h2 class="font-semibold mb-3 text-sm">Por Forma de Pagamento</h2>
+          <div id="lista-pagamentos"></div>
+        </div>
+        <div class="card">
+          <h2 class="font-semibold mb-3 text-sm">Resumo</h2>
+          <div id="resumo-extra"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="font-semibold mb-3 text-sm">Detalhamento de Vendas</h2>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr>
+              <th>#</th><th>Data/Hora</th><th>Operador</th><th>Pagamento</th><th>Desconto</th><th>Total</th>
+            </tr></thead>
+            <tbody id="tbody-vendas">
+              <tr><td colspan="6" class="text-center py-6 text-gray-500">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ABA: PRODUTOS ===== -->
+    <div id="panel-produtos" class="hidden">
+      <div class="card">
+        <h2 class="font-semibold mb-3 text-sm">Produtos Mais Vendidos no Período</h2>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr>
+              <th>#</th><th>Produto</th><th>Cód. Barras</th><th>Qtd Vendida</th><th>Nº Vendas</th><th>Receita</th>
+            </tr></thead>
+            <tbody id="tbody-produtos">
+              <tr><td colspan="6" class="text-center py-6 text-gray-500">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ABA: CAIXA ===== -->
+    <div id="panel-caixa" class="hidden">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+        <div class="stat-box"><div class="lbl">Caixas Fechados</div><div class="val" id="s-caixas">—</div></div>
+        <div class="stat-box"><div class="lbl">Receita Total</div><div class="val text-green-400" id="s-cx-receita">—</div></div>
+        <div class="stat-box"><div class="lbl">Saldo Líquido</div><div class="val text-blue-400" id="s-cx-saldo">—</div></div>
+      </div>
+      <div class="card">
+        <h2 class="font-semibold mb-3 text-sm">Histórico de Caixas</h2>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr>
+              <th>Abertura</th><th>Fechamento</th><th>Operador</th><th>Saldo Inicial</th><th>Saldo Final</th><th>Vendas</th><th>Status</th>
+            </tr></thead>
+            <tbody id="tbody-caixa">
+              <tr><td colspan="7" class="text-center py-6 text-gray-500">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ABA: ESTOQUE ===== -->
+    <div id="panel-estoque" class="hidden">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+        <div class="stat-box"><div class="lbl">Total Itens</div><div class="val" id="s-est-itens">—</div></div>
+        <div class="stat-box"><div class="lbl">Valor em Estoque</div><div class="val text-blue-400" id="s-est-valor">—</div></div>
+        <div class="stat-box"><div class="lbl">Abaixo do Mín.</div><div class="val text-red-400" id="s-est-min">—</div></div>
+      </div>
+      <div class="card">
+        <h2 class="font-semibold mb-3 text-sm">Posição de Estoque Atual</h2>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr>
+              <th>#</th><th>Produto</th><th>Categoria</th><th>Unidade</th><th>Estoque</th><th>Mínimo</th><th>Custo Unit.</th><th>Valor Total</th><th>Situação</th>
+            </tr></thead>
+            <tbody id="tbody-estoque">
+              <tr><td colspan="9" class="text-center py-6 text-gray-500">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    let abaAtual = 'vendas';
+    let dadosAtuais = null;
+    let chartVendas = null;
+
+    async function init() {
+      await checkAuth();
+      const hoje = new Date();
+      const pIni = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      document.getElementById('f-de').value  = fmt(pIni);
+      document.getElementById('f-ate').value = fmt(hoje);
+      await carregarAba();
+    }
+
+    function fmt(d) {
+      return d.toISOString().split('T')[0];
+    }
+
+    function setRange(tipo) {
+      const hoje = new Date();
+      let de, ate;
+      ate = fmt(hoje);
+      if (tipo === 'hoje')    { de = fmt(hoje); }
+      if (tipo === 'semana')  { const d7 = new Date(hoje); d7.setDate(hoje.getDate()-6); de = fmt(d7); }
+      if (tipo === 'mes')     { de = fmt(new Date(hoje.getFullYear(), hoje.getMonth(), 1)); }
+      if (tipo === 'mes_ant') {
+        const p = new Date(hoje.getFullYear(), hoje.getMonth()-1, 1);
+        de  = fmt(p);
+        ate = fmt(new Date(hoje.getFullYear(), hoje.getMonth(), 0));
+      }
+      document.getElementById('f-de').value  = de;
+      document.getElementById('f-ate').value = ate;
+      carregarAba();
+    }
+
+    function switchTab(aba) {
+      abaAtual = aba;
+      ['vendas','produtos','caixa','estoque'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.toggle('active', t === aba);
+        document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== aba);
+      });
+      carregarAba();
+    }
+
+    async function carregarAba() {
+      const de  = document.getElementById('f-de').value;
+      const ate = document.getElementById('f-ate').value;
+
+      if (abaAtual === 'vendas') {
+        await carregarVendas(de, ate);
+      } else if (abaAtual === 'produtos') {
+        await carregarProdutos(de, ate);
+      } else if (abaAtual === 'caixa') {
+        await carregarCaixa(de, ate);
+      } else if (abaAtual === 'estoque') {
+        await carregarEstoque();
+      }
+    }
+
+    // ============= VENDAS =============
+    async function carregarVendas(de, ate) {
+      document.getElementById('tbody-vendas').innerHTML = '<tr><td colspan="6" class="text-center py-6 text-gray-500">Carregando...</td></tr>';
+      const res = await API.get(`/relatorios.php?action=vendas&de=${de}&ate=${ate}`);
+      if (!res?.ok) { toast('Erro ao carregar relatório.', 'error'); return; }
+      const d = res.data;
+      dadosAtuais = d;
+
+      document.getElementById('s-total-v').textContent   = d.resumo.total_vendas || 0;
+      document.getElementById('s-dias-v').textContent    = `${d.resumo.dias_com_venda || 0} dias com vendas`;
+      document.getElementById('s-receita').textContent   = formatCurrency(d.resumo.receita_total);
+      document.getElementById('s-ticket').textContent    = formatCurrency(d.resumo.ticket_medio);
+      document.getElementById('s-descontos').textContent = formatCurrency(d.resumo.total_descontos);
+
+      renderChartVendas(d.por_dia);
+      renderPagamentos(d.por_pagamento);
+
+      document.getElementById('resumo-extra').innerHTML = `
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span class="text-gray-500">Total vendas:</span><span class="font-bold">${d.resumo.total_vendas}</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Receita bruta:</span><span class="font-bold text-green-400">${formatCurrency(d.resumo.receita_total)}</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Descontos:</span><span class="font-bold text-red-400">- ${formatCurrency(d.resumo.total_descontos)}</span></div>
+          <div class="flex justify-between border-t border-gray-700 pt-2 mt-1"><span class="text-gray-400 font-bold">Receita líquida:</span><span class="font-bold text-blue-400">${formatCurrency((d.resumo.receita_total||0) - (d.resumo.total_descontos||0))}</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Ticket médio:</span><span class="font-bold">${formatCurrency(d.resumo.ticket_medio)}</span></div>
+        </div>
+      `;
+
+      const tbody = document.getElementById('tbody-vendas');
+      if (!d.vendas.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-gray-500">Nenhuma venda no período.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = d.vendas.map((v,i) => `
+        <tr>
+          <td class="text-xs text-gray-600">${v.id}</td>
+          <td class="text-xs text-gray-400">${new Date(v.created_at).toLocaleString('pt-BR')}</td>
+          <td class="text-sm">${v.operador || '—'}</td>
+          <td><span class="badge badge-info text-xs">${labelPgto(v.forma_pagamento)}</span></td>
+          <td class="text-red-400 text-sm">${formatCurrency(v.desconto)}</td>
+          <td class="font-bold text-green-400">${formatCurrency(v.total)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function labelPgto(f) {
+      const m = {dinheiro:'Dinheiro',cartao_credito:'Crédito',cartao_debito:'Débito',pix:'PIX',fiado:'Fiado'};
+      return m[f] || f || '—';
+    }
+
+    function renderChartVendas(porDia) {
+      const ctx = document.getElementById('chart-vendas');
+      if (chartVendas) { chartVendas.destroy(); chartVendas = null; }
+      if (!porDia.length) return;
+      const labels = porDia.map(d => new Date(d.dia + 'T00:00:00').toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit'}));
+      const receita = porDia.map(d => parseFloat(d.total_dia || 0));
+      const numVendas = porDia.map(d => parseInt(d.num_vendas || 0));
+      chartVendas = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Receita (R$)', data: receita, backgroundColor: 'rgba(37,99,235,.7)', borderRadius: 6, yAxisID: 'y' },
+            { label: 'Nº Vendas', data: numVendas, type: 'line', borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.15)', tension: .35, fill: true, yAxisID: 'y1', pointRadius: 3 },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+          scales: {
+            x:  { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.04)' } },
+            y:  { ticks: { color: '#64748b', font: { size: 10 }, callback: v => 'R$' + v.toFixed(0) }, grid: { color: 'rgba(255,255,255,.05)' } },
+            y1: { position: 'right', ticks: { color: '#22c55e', font: { size: 10 } }, grid: { drawOnChartArea: false } },
+          }
+        }
+      });
+    }
+
+    function renderPagamentos(list) {
+      const el = document.getElementById('lista-pagamentos');
+      if (!list.length) { el.innerHTML = '<p class="text-gray-500 text-sm">Nenhum dado.</p>'; return; }
+      const total = list.reduce((s,p) => s + parseFloat(p.total||0), 0);
+      el.innerHTML = list.map(p => {
+        const pct = total ? Math.round((p.total/total)*100) : 0;
+        return `
+          <div class="mb-3">
+            <div class="flex justify-between text-sm mb-1">
+              <span class="font-medium">${labelPgto(p.forma_pagamento)}</span>
+              <span class="text-gray-400">${p.num} vendas · ${formatCurrency(p.total)} (${pct}%)</span>
+            </div>
+            <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div class="h-full bg-blue-500 rounded-full" style="width:${pct}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ============= PRODUTOS =============
+    async function carregarProdutos(de, ate) {
+      document.getElementById('tbody-produtos').innerHTML = '<tr><td colspan="6" class="text-center py-6 text-gray-500">Carregando...</td></tr>';
+      const res = await API.get(`/relatorios.php?action=produtos_mais_vendidos&de=${de}&ate=${ate}`);
+      if (!res?.ok) return;
+      dadosAtuais = res.data;
+      const tbody = document.getElementById('tbody-produtos');
+      if (!res.data.produtos.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-gray-500">Nenhum produto vendido no período.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = res.data.produtos.map((p,i) => `
+        <tr>
+          <td class="text-gray-600 text-xs">${i+1}</td>
+          <td class="font-medium">${p.nome}</td>
+          <td class="text-xs text-gray-500 font-mono">${p.codigo_barras || '—'}</td>
+          <td class="font-bold text-blue-400">${formatNum(p.qtd_vendida)} ${p.unidade}</td>
+          <td class="text-gray-400 text-sm">${p.num_vendas}</td>
+          <td class="font-bold text-green-400">${formatCurrency(p.receita)}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ============= CAIXA =============
+    async function carregarCaixa(de, ate) {
+      document.getElementById('tbody-caixa').innerHTML = '<tr><td colspan="7" class="text-center py-6 text-gray-500">Carregando...</td></tr>';
+      const res = await API.get(`/relatorios.php?action=fluxo_caixa&de=${de}&ate=${ate}`);
+      if (!res?.ok) return;
+      dadosAtuais = res.data;
+      const { resumo, caixas } = res.data;
+      document.getElementById('s-caixas').textContent    = resumo.num_caixas || 0;
+      document.getElementById('s-cx-receita').textContent = formatCurrency(resumo.receita);
+      document.getElementById('s-cx-saldo').textContent   = formatCurrency(resumo.saldo_liquido);
+
+      const tbody = document.getElementById('tbody-caixa');
+      if (!caixas.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-gray-500">Nenhum caixa no período.</td></tr>';
+        return;
+      }
+      const stCls = { aberto:'badge-success', fechado:'badge-info', cancelado:'badge-danger' };
+      tbody.innerHTML = caixas.map(c => `
+        <tr>
+          <td class="text-xs text-gray-400">${c.aberto_em ? new Date(c.aberto_em).toLocaleString('pt-BR') : '—'}</td>
+          <td class="text-xs text-gray-400">${c.fechado_em ? new Date(c.fechado_em).toLocaleString('pt-BR') : '—'}</td>
+          <td class="text-sm">${c.operador || '—'}</td>
+          <td class="text-gray-400">${formatCurrency(c.saldo_inicial)}</td>
+          <td class="font-bold">${formatCurrency(c.saldo_final)}</td>
+          <td class="font-bold text-green-400">${formatCurrency(c.total_vendas)}</td>
+          <td><span class="badge ${stCls[c.status]||'badge-info'}">${c.status}</span></td>
+        </tr>
+      `).join('');
+    }
+
+    // ============= ESTOQUE =============
+    async function carregarEstoque() {
+      document.getElementById('tbody-estoque').innerHTML = '<tr><td colspan="9" class="text-center py-6 text-gray-500">Carregando...</td></tr>';
+      const res = await API.get('/relatorios.php?action=estoque');
+      if (!res?.ok) return;
+      dadosAtuais = res.data;
+      document.getElementById('s-est-itens').textContent = res.data.produtos.length;
+      document.getElementById('s-est-valor').textContent = formatCurrency(res.data.valor_total);
+      document.getElementById('s-est-min').textContent   = res.data.abaixo_min;
+
+      const tbody = document.getElementById('tbody-estoque');
+      tbody.innerHTML = res.data.produtos.map((p,i) => {
+        const est = parseFloat(p.estoque), min = parseFloat(p.estoque_minimo);
+        let badge, cls;
+        if (est <= 0)  { badge='Sem estoque'; cls='badge-danger'; }
+        else if (est <= min) { badge='Baixo'; cls='badge-warning'; }
+        else { badge='Normal'; cls='badge-success'; }
+        return `
+          <tr>
+            <td class="text-xs text-gray-600">${i+1}</td>
+            <td class="font-medium">${p.nome}</td>
+            <td class="text-xs text-gray-500">${p.categoria || '—'}</td>
+            <td class="text-gray-400 text-sm">${p.unidade}</td>
+            <td class="font-bold ${est<=min?'text-red-400':'text-green-400'}">${formatNum(est)}</td>
+            <td class="text-gray-500 text-sm">${formatNum(min)}</td>
+            <td class="text-gray-400 text-sm">${formatCurrency(p.custo)}</td>
+            <td class="font-bold text-blue-400">${formatCurrency(p.valor_estoque)}</td>
+            <td><span class="badge ${cls}">${badge}</span></td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="9" class="text-center py-6 text-gray-500">Nenhum produto.</td></tr>';
+    }
+
+    // ============= EXPORTAÇÕES =============
+    function exportarPDF() {
+      window.print();
+    }
+
+    function exportarCSV() {
+      if (!dadosAtuais) { toast('Carregue um relatório antes de exportar.', 'warning'); return; }
+      let csv = '', nome = 'relatorio';
+
+      if (abaAtual === 'vendas' && dadosAtuais.vendas) {
+        nome = `vendas_${document.getElementById('f-de').value}_${document.getElementById('f-ate').value}`;
+        csv = 'ID,Data,Operador,Pagamento,Desconto,Total\n';
+        csv += dadosAtuais.vendas.map(v =>
+          `"${v.id}","${v.created_at}","${v.operador||''}","${v.forma_pagamento||''}","${v.desconto||0}","${v.total||0}"`
+        ).join('\n');
+      } else if (abaAtual === 'produtos' && dadosAtuais.produtos) {
+        nome = `produtos_mais_vendidos`;
+        csv = 'Produto,Cód.Barras,Qtd Vendida,Nº Vendas,Receita\n';
+        csv += dadosAtuais.produtos.map(p =>
+          `"${p.nome}","${p.codigo_barras||''}","${p.qtd_vendida}","${p.num_vendas}","${p.receita}"`
+        ).join('\n');
+      } else if (abaAtual === 'estoque' && dadosAtuais.produtos) {
+        nome = 'estoque_atual';
+        csv = 'Produto,Categoria,Unidade,Estoque,Mínimo,Custo,Valor Total\n';
+        csv += dadosAtuais.produtos.map(p =>
+          `"${p.nome}","${p.categoria||''}","${p.unidade}","${p.estoque}","${p.estoque_minimo}","${p.custo}","${p.valor_estoque}"`
+        ).join('\n');
+      }
+
+      if (!csv) { toast('Nada para exportar.', 'warning'); return; }
+      const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = nome + '.csv'; a.click();
+      URL.revokeObjectURL(url);
+      toast('CSV exportado!', 'success');
+    }
+
+    function exportarXML() {
+      if (!dadosAtuais) { toast('Carregue um relatório antes de exportar.', 'warning'); return; }
+      let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+      let nome = 'relatorio';
+
+      if (abaAtual === 'vendas' && dadosAtuais.vendas) {
+        nome = `vendas_${document.getElementById('f-de').value}`;
+        xml += '<relatorio tipo="vendas">\n';
+        xml += `  <periodo de="${dadosAtuais.periodo?.de}" ate="${dadosAtuais.periodo?.ate}"/>\n`;
+        xml += `  <resumo total_vendas="${dadosAtuais.resumo.total_vendas}" receita="${dadosAtuais.resumo.receita_total}" ticket_medio="${dadosAtuais.resumo.ticket_medio}"/>\n`;
+        xml += '  <vendas>\n';
+        xml += dadosAtuais.vendas.map(v =>
+          `    <venda id="${v.id}" data="${v.created_at}" operador="${esc(v.operador)}" pagamento="${v.forma_pagamento||''}" desconto="${v.desconto||0}" total="${v.total}"/>`
+        ).join('\n');
+        xml += '\n  </vendas>\n</relatorio>';
+      } else if (abaAtual === 'produtos' && dadosAtuais.produtos) {
+        nome = 'produtos_mais_vendidos';
+        xml += '<relatorio tipo="produtos_mais_vendidos">\n';
+        xml += dadosAtuais.produtos.map((p,i) =>
+          `  <produto rank="${i+1}" nome="${esc(p.nome)}" qtd_vendida="${p.qtd_vendida}" receita="${p.receita}"/>`
+        ).join('\n');
+        xml += '\n</relatorio>';
+      } else if (abaAtual === 'estoque' && dadosAtuais.produtos) {
+        nome = 'estoque_atual';
+        xml += `<relatorio tipo="estoque" valor_total="${dadosAtuais.valor_total}">\n`;
+        xml += dadosAtuais.produtos.map(p =>
+          `  <produto nome="${esc(p.nome)}" categoria="${esc(p.categoria)}" estoque="${p.estoque}" minimo="${p.estoque_minimo}" custo="${p.custo}" valor_total="${p.valor_estoque}"/>`
+        ).join('\n');
+        xml += '\n</relatorio>';
+      }
+
+      if (!xml || xml.length < 50) { toast('Nada para exportar.', 'warning'); return; }
+      const blob = new Blob([xml], { type: 'application/xml;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = nome + '.xml'; a.click();
+      URL.revokeObjectURL(url);
+      toast('XML exportado!', 'success');
+    }
+
+    function esc(s) {
+      return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    init();
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PDVo">
+  <link rel="apple-touch-icon" href="./assets/icons/icon.php?size=180">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDVo - Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./assets/css/pdv.css">
+  <style>
+    body { background: #020617; color: #f1f5f9; min-height: 100vh; }
+    @keyframes logo-tilt { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-10deg)} 75%{transform:rotate(10deg)} }
+    .animate-tilt { animation: logo-tilt 2s ease-in-out infinite; }
+    .inp { background: #0f172a; border: 1px solid #1e293b; color: #f1f5f9; border-radius: 10px; padding: 11px 14px; width: 100%; outline: none; font-size: 14px; transition: border-color .2s; }
+    .inp:focus { border-color: #3b82f6; }
+    .glass { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
+    .tenant-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; cursor: pointer; transition: background .15s; }
+    .tenant-item:hover { background: rgba(255,255,255,.06); }
+    .tenant-item.active { background: rgba(59,130,246,.15); border: 1px solid rgba(59,130,246,.35); }
+    #dropdown-tenants { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; max-height: 220px; overflow-y: auto; position: absolute; z-index: 50; width: 100%; top: calc(100% + 6px); left: 0; box-shadow: 0 20px 40px rgba(0,0,0,.5); display: none; }
+    #dropdown-tenants.open { display: block; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .fade-in { animation: fadeIn .3s ease forwards; }
+  </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+
+  <!-- Fundo gradiente -->
+  <div class="fixed inset-0 pointer-events-none">
+    <div class="absolute top-[-15%] left-[-10%] w-80 h-80 rounded-full bg-blue-700/10 blur-3xl"></div>
+    <div class="absolute bottom-[-10%] right-[-5%] w-64 h-64 rounded-full bg-indigo-700/10 blur-3xl"></div>
+  </div>
+
+  <div class="relative w-full max-w-sm px-5">
+    <!-- Logo -->
+    <div class="text-center mb-8">
+      <div class="text-5xl font-black text-blue-400 tracking-tight">PDVo</div>
+      <p class="text-slate-500 text-sm mt-1">Sistema de Ponto de Venda</p>
+    </div>
+
+    <!-- Card de login -->
+    <div class="glass rounded-2xl p-6 shadow-2xl">
+      <h2 class="text-base font-bold mb-5 text-slate-200">Acesse sua conta</h2>
+
+      <!-- Seletor de empresa -->
+      <div class="mb-4">
+        <label class="block text-[10px] text-slate-500 mb-1.5 font-bold uppercase tracking-widest">Empresa</label>
+        <div class="relative">
+          <input id="tenant-search" class="inp pr-9" placeholder="Buscar empresa..." autocomplete="off"
+            oninput="buscarTenants(this.value)" onfocus="buscarTenants(this.value)" readonly>
+          <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none">▼</span>
+          <div id="dropdown-tenants"></div>
+        </div>
+        <p class="text-[10px] text-slate-600 mt-1" id="tenant-hint">Selecione sua empresa para continuar.</p>
+      </div>
+
+      <!-- Formulário de login (oculto até selecionar empresa) -->
+      <div id="form-section" class="hidden fade-in">
+        <div class="mb-4">
+          <label class="block text-[10px] text-slate-500 mb-1.5 font-bold uppercase tracking-widest">E-mail</label>
+          <input id="email" type="email" class="inp" placeholder="seu@email.com" required>
+        </div>
+        <div class="mb-4">
+          <label class="block text-[10px] text-slate-500 mb-1.5 font-bold uppercase tracking-widest">Senha</label>
+          <div class="relative">
+            <input id="senha" type="password" class="inp pr-10" placeholder="••••••••" required>
+            <button type="button" onclick="togglePass()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white text-sm">🔓</button>
+          </div>
+        </div>
+
+        <!-- Toggle: Lembrar desta conta -->
+        <div class="flex items-center justify-between mb-5 px-1">
+          <label class="flex items-center gap-3 cursor-pointer select-none group" onclick="toggleLembrar()">
+            <div id="toggle-lembrar"
+              class="relative w-10 h-[22px] rounded-full transition-all duration-200 bg-slate-700 border border-slate-600 flex-shrink-0">
+              <span id="toggle-knob"
+                class="absolute top-[3px] left-[3px] w-4 h-4 rounded-full transition-all duration-200 bg-slate-400"></span>
+            </div>
+            <span class="text-xs text-slate-500 group-hover:text-slate-300 transition-colors">Lembrar desta conta</span>
+          </label>
+          <span id="lembrar-badge" class="hidden text-[10px] text-blue-400 font-bold bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
+            Salvo ✓
+          </span>
+        </div>
+
+        <button id="btn-login" onclick="fazerLogin()"
+          class="w-full bg-blue-600 hover:bg-blue-500 font-black py-3 rounded-xl transition-all text-sm uppercase tracking-widest">
+          Entrar
+        </button>
+        <p id="error-msg" class="text-red-400 text-xs text-center mt-3 hidden bg-red-500/10 p-2 rounded-lg border border-red-500/20"></p>
+      </div>
+
+      <!-- Linha divisória -->
+      <div class="mt-6 pt-5 border-t border-white/5 text-center">
+        <p class="text-slate-500 text-xs mb-3">Ainda não tem conta?</p>
+        <a href="assinatura.html"
+          class="inline-block text-blue-400 hover:text-blue-300 font-black text-xs uppercase tracking-tight border border-blue-400/30 px-5 py-2 rounded-full hover:bg-blue-400/5 transition-all">
+           Criar Nova Assinatura
+        </a>
+      </div>
+    </div>
+
+    <!-- Status DB + rodapé -->
+    <div class="mt-8 flex flex-col items-center gap-4">
+      <div id="db-status" class="flex items-center gap-2 px-4 py-1.5 glass rounded-full">
+        <span class="relative flex h-2 w-2">
+          <span id="db-ping" class="absolute inline-flex h-full w-full rounded-full opacity-75"></span>
+          <span id="db-dot" class="relative inline-flex rounded-full h-2 w-2 bg-slate-600"></span>
+        </span>
+        <span id="db-text" class="text-[9px] uppercase tracking-[.2em] text-slate-500 font-black">Verificando...</span>
+      </div>
+      <div class="text-center opacity-30 hover:opacity-80 transition-opacity">
+        <img src="https://enxos.online/enxos.png" alt="EnX OS" class="w-5 h-5 mx-auto mb-1 animate-tilt">
+        <p class="text-[9px] uppercase tracking-widest text-slate-500">&copy; 2026 EnX OS Enterprise</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Download do App -->
+  <div id="modal-app" class="fixed inset-0 z-50 hidden items-center justify-center p-4" style="background:rgba(0,0,0,.75);backdrop-filter:blur(6px)">
+    <div class="glass rounded-2xl p-7 max-w-sm w-full shadow-2xl text-center border border-white/10 fade-in">
+      <div class="text-4xl mb-3">📱</div>
+      <h2 class="text-xl font-black text-white mb-2" id="app-modal-titulo">Baixe nosso App!</h2>
+      <p class="text-slate-400 text-sm mb-6 leading-relaxed" id="app-modal-msg">Tenha o sistema na palma da mão.</p>
+      <div class="flex flex-col gap-3 mb-5">
+        <a id="app-btn-android" href="#" target="_blank" rel="noopener"
+          class="hidden items-center justify-center gap-2 bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl text-sm transition-all">
+          ▶ Google Play — Android
+        </a>
+        <a id="app-btn-ios" href="#" target="_blank" rel="noopener"
+          class="hidden items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-black py-3 rounded-xl text-sm transition-all">
+           Apple App Store — iOS
+        </a>
+      </div>
+      <button onclick="fecharModalApp()"
+        class="text-xs text-slate-500 hover:text-slate-300 transition-colors underline">
+        Agora não
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let tenantSelecionado = null;
+    let allTenants = [];
+
+    // ---- Buscar tenants ----
+    async function buscarTenants(q) {
+      const dd = document.getElementById('dropdown-tenants');
+      dd.classList.add('open');
+      dd.innerHTML = '<p class="text-xs text-slate-500 p-3">Carregando...</p>';
+
+      try {
+        const url = `./api/tenants.php${q ? '?q=' + encodeURIComponent(q) : ''}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        allTenants = data.tenants || [];
+        renderDropdown(allTenants);
+      } catch {
+        dd.innerHTML = '<p class="text-xs text-red-400 p-3">Erro ao carregar empresas.</p>';
+      }
+    }
+
+    function renderDropdown(list) {
+      const dd = document.getElementById('dropdown-tenants');
+      if (!list.length) {
+        dd.innerHTML = '<p class="text-xs text-slate-500 p-3 text-center">Nenhuma empresa encontrada.</p>';
+        return;
+      }
+      dd.innerHTML = list.map(t => `
+        <div class="tenant-item" onclick="selecionarTenant('${t.slug}','${escHtml(t.razao_social)}','${t.plano_nome}')">
+          <div class="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400 font-black text-xs flex-shrink-0">
+            ${t.razao_social.charAt(0).toUpperCase()}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-slate-200 truncate">${escHtml(t.razao_social)}</p>
+            <p class="text-[10px] text-slate-500">${t.plano_nome}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function selecionarTenant(slug, nome, plano) {
+      tenantSelecionado = slug;
+      document.getElementById('tenant-search').value = nome;
+      document.getElementById('tenant-search').readOnly = false;
+      document.getElementById('tenant-hint').textContent = `Plano ${plano} • Código: ${slug}`;
+      document.getElementById('dropdown-tenants').classList.remove('open');
+      document.getElementById('form-section').classList.remove('hidden');
+      document.getElementById('email').focus();
+      checkDatabase(slug);
+      _salvarConta(); // salva empresa se toggle ativo
+    }
+
+    // ---- Login ----
+    async function fazerLogin() {
+      if (!tenantSelecionado) { return; }
+
+      const btn   = document.getElementById('btn-login');
+      const err   = document.getElementById('error-msg');
+      const email = document.getElementById('email').value.trim();
+      const senha = document.getElementById('senha').value;
+
+      if (!email || !senha) { showErr('Preencha e-mail e senha.'); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Autenticando...';
+      err.classList.add('hidden');
+
+      try {
+        const res  = await fetch('./api/login.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tenant_slug: tenantSelecionado, email, senha })
+        });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || 'Falha no login');
+
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('tenant', JSON.stringify(data.tenant));
+        const tema = data.tema || 'light';
+        localStorage.setItem('tema', tema);
+        document.documentElement.setAttribute('data-tema', tema);
+        _salvarConta(); // salva e-mail no lembrar (se toggle ativo)
+        window.location.href = 'dashboard.html';
+      } catch (e) {
+        showErr(e.message);
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
+      }
+    }
+
+    function showErr(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    // ---- Status DB ----
+    async function checkDatabase(slug) {
+      const dot  = document.getElementById('db-dot');
+      const ping = document.getElementById('db-ping');
+      const text = document.getElementById('db-text');
+      try {
+        const res = await fetch(`./api/healthcheck.php`);
+        const d   = await res.json();
+        if (res.ok && d.status === 'online') {
+          dot.className  = 'relative inline-flex rounded-full h-2 w-2 bg-green-500';
+          ping.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75';
+          text.textContent = `${(slug || 'SISTEMA').toUpperCase()} ONLINE`;
+          text.className = 'text-[9px] uppercase tracking-[.2em] text-green-500 font-black';
+        } else throw new Error();
+      } catch {
+        dot.className  = 'relative inline-flex rounded-full h-2 w-2 bg-red-600';
+        ping.className = 'absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-20';
+        text.textContent = 'SERVIDOR OFFLINE';
+        text.className = 'text-[9px] uppercase tracking-[.2em] text-red-500 font-black';
+      }
+    }
+
+    function togglePass() {
+      const i = document.getElementById('senha');
+      i.type = i.type === 'password' ? 'text' : 'password';
+    }
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ---- Lembrar desta conta ----
+    const LS_KEY = 'pdvo_lembrar';
+    let _lembrarAtivo = false;
+
+    function _setLembrarUI(on) {
+      _lembrarAtivo = on;
+      const knob   = document.getElementById('toggle-knob');
+      const track  = document.getElementById('toggle-lembrar');
+      const badge  = document.getElementById('lembrar-badge');
+      if (on) {
+        track.classList.replace('bg-slate-700','bg-blue-600');
+        track.classList.replace('border-slate-600','border-blue-500');
+        knob.classList.replace('bg-slate-400','bg-white');
+        knob.style.left = '22px';
+        badge.classList.remove('hidden');
+      } else {
+        track.classList.replace('bg-blue-600','bg-slate-700');
+        track.classList.replace('border-blue-500','border-slate-600');
+        knob.classList.replace('bg-white','bg-slate-400');
+        knob.style.left = '3px';
+        badge.classList.add('hidden');
+        localStorage.removeItem(LS_KEY);   // limpa ao desligar
+      }
+    }
+
+    function toggleLembrar() {
+      _setLembrarUI(!_lembrarAtivo);
+      // Se ativou e já tem empresa selecionada, salva agora
+      if (_lembrarAtivo && tenantSelecionado) _salvarConta();
+    }
+
+    function _salvarConta() {
+      if (!_lembrarAtivo || !tenantSelecionado) return;
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        slug:  tenantSelecionado,
+        nome:  document.getElementById('tenant-search').value,
+        hint:  document.getElementById('tenant-hint').textContent,
+        email: document.getElementById('email').value.trim(),
+      }));
+    }
+
+    // Carrega conta salva ao abrir a página
+    (function _carregarContaSalva() {
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        if (!saved || !saved.slug) return;
+
+        // Ativa o toggle visualmente
+        _setLembrarUI(true);
+
+        // Seleciona tenant
+        tenantSelecionado = saved.slug;
+        document.getElementById('tenant-search').value       = saved.nome  || saved.slug;
+        document.getElementById('tenant-hint').textContent   = saved.hint  || `Código: ${saved.slug}`;
+        document.getElementById('form-section').classList.remove('hidden');
+
+        // Preenche e-mail
+        if (saved.email) document.getElementById('email').value = saved.email;
+
+        // Foca na senha
+        setTimeout(() => document.getElementById('senha').focus(), 150);
+
+        checkDatabase(saved.slug);
+      } catch (_) {}
+    })();
+
+    // Fecha dropdown ao clicar fora
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#tenant-search') && !e.target.closest('#dropdown-tenants')) {
+        document.getElementById('dropdown-tenants').classList.remove('open');
+      }
+    });
+
+    // Enter no campo de senha faz login
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && tenantSelecionado) fazerLogin();
+    });
+
+    // ---- Modal App / Download ----
+    function fecharModalApp() {
+      document.getElementById('modal-app').classList.add('hidden');
+      document.getElementById('modal-app').classList.remove('flex');
+      sessionStorage.setItem('app_modal_dispensado', '1');
+    }
+
+    async function verificarModalApp() {
+      if (sessionStorage.getItem('app_modal_dispensado')) return;
+      try {
+        const res  = await fetch('./api/assinatura.php?action=get_app_config');
+        const data = await res.json();
+        if (!data.ok || !data.ativo) return;
+        document.getElementById('app-modal-titulo').textContent = data.titulo  || 'Baixe nosso App!';
+        document.getElementById('app-modal-msg').textContent    = data.mensagem || '';
+        const btnAndroid = document.getElementById('app-btn-android');
+        const btnIos     = document.getElementById('app-btn-ios');
+        if (data.url_android) { btnAndroid.href = data.url_android; btnAndroid.classList.remove('hidden'); btnAndroid.classList.add('flex'); }
+        if (data.url_ios)     { btnIos.href     = data.url_ios;     btnIos.classList.remove('hidden');     btnIos.classList.add('flex'); }
+        const modal = document.getElementById('modal-app');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      } catch (e) {}
+    }
+
+    // Fecha modal ao clicar fora do card
+    document.getElementById('modal-app').addEventListener('click', e => {
+      if (e.target === document.getElementById('modal-app')) fecharModalApp();
+    });
+
+    // Inicializa verificando o banco
+    checkDatabase();
+    verificarModalApp();
+
+    // Abre dropdown logo no foco (primeiro toque)
+    document.getElementById('tenant-search').addEventListener('click', () => buscarTenants(''));
+  </script>
+
+  <!-- PWA: Instalação e Service Worker -->
+  <div id="pwa-banner" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
+    <div class="glass rounded-2xl px-5 py-4 flex items-center gap-4 shadow-2xl border border-blue-500/30 fade-in">
+      <img src="./assets/icons/icon.svg" class="w-10 h-10 rounded-xl flex-shrink-0" alt="PDVo">
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-black text-white">Instalar PDVo</p>
+        <p class="text-[11px] text-slate-400">Acesse como app, sem precisar do navegador.</p>
+      </div>
+      <button id="pwa-install-btn" class="flex-shrink-0 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs px-4 py-2 rounded-xl transition-all">
+        Instalar
+      </button>
+      <button onclick="document.getElementById('pwa-banner').classList.add('hidden');sessionStorage.setItem('pwa_dispensado','1')"
+        class="flex-shrink-0 text-slate-500 hover:text-slate-300 text-lg leading-none">✕</button>
+    </div>
+  </div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+
+    // Prompt de instalação PWA
+    let _deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      _deferredPrompt = e;
+      if (!sessionStorage.getItem('pwa_dispensado')) {
+        setTimeout(() => {
+          document.getElementById('pwa-banner').classList.remove('hidden');
+        }, 2000);
+      }
+    });
+
+    document.getElementById('pwa-install-btn').addEventListener('click', async () => {
+      if (!_deferredPrompt) return;
+      _deferredPrompt.prompt();
+      const { outcome } = await _deferredPrompt.userChoice;
+      _deferredPrompt = null;
+      document.getElementById('pwa-banner').classList.add('hidden');
+    });
+
+    window.addEventListener('appinstalled', () => {
+      document.getElementById('pwa-banner').classList.add('hidden');
+      _deferredPrompt = null;
+    });
+  </script>
+</body>
+</html>

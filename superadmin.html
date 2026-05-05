@@ -1,0 +1,1911 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDVo — SuperAdmin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --sidebar-w: 240px;
+      --bg:       #030712;
+      --card:     #0a1628;
+      --border:   rgba(255,255,255,.07);
+      --text:     #f1f5f9;
+      --muted:    #94a3b8;
+      --subtle:   #475569;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; display: flex; }
+
+    /* ---- Sidebar ---- */
+    .sidebar {
+      width: var(--sidebar-w); flex-shrink: 0;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      position: fixed; top: 0; left: 0; bottom: 0;
+      z-index: 100;
+      transition: transform .3s;
+    }
+    .sidebar.open { transform: translateX(0) !important; }
+    #sidebar-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 99;
+    }
+    #sidebar-overlay.open { display: block; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 20px; border-radius: 10px; margin: 0 8px;
+      font-size: 13px; font-weight: 600; color: var(--muted);
+      cursor: pointer; transition: all .18s; user-select: none;
+    }
+    .nav-item:hover { background: rgba(255,255,255,.05); color: var(--text); }
+    .nav-item.active { background: rgba(59,130,246,.15); color: #60a5fa; }
+    .nav-icon { width: 16px; height: 16px; flex-shrink: 0; }
+    .n-badge {
+      margin-left: auto; background: #ef4444; color: #fff;
+      font-size: 10px; font-weight: 800; min-width: 18px; height: 18px;
+      border-radius: 99px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px;
+    }
+    .hamburger { display: none; }
+    @media (max-width:768px) {
+      .sidebar { transform: translateX(-100%); }
+      .hamburger { display: flex !important; }
+      .main-wrapper { margin-left: 0 !important; }
+    }
+
+    /* ---- Main ---- */
+    .main-wrapper { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-height: 100vh; min-width: 0; }
+    .topbar { background: var(--card); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; position: sticky; top: 0; z-index: 10; }
+    .page-body { padding: 28px 24px; flex: 1; }
+
+    /* ---- Cards ---- */
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; }
+    .stat-card { background: var(--card); border: 1px solid rgba(255,255,255,.07); border-radius: 16px; padding: 20px; }
+    .pedido-card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; }
+    .pedido-card.highlight { border-color: rgba(245,158,11,.3); }
+
+    /* ---- Buttons ---- */
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; transition: all .18s; padding: 9px 16px; }
+    .btn-blue   { background: #2563eb; color: #fff; }
+    .btn-blue:hover   { background: #1d4ed8; }
+    .btn-green  { background: #16a34a; color: #fff; }
+    .btn-green:hover  { background: #15803d; }
+    .btn-red    { background: #dc2626; color: #fff; }
+    .btn-red:hover    { background: #b91c1c; }
+    .btn-amber  { background: #d97706; color: #fff; }
+    .btn-amber:hover  { background: #b45309; }
+    .btn-ghost  { background: rgba(255,255,255,.06); color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover  { background: rgba(255,255,255,.1); color: var(--text); }
+    .btn-sm     { padding: 5px 11px; font-size: 11px; border-radius: 7px; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ---- Inputs ---- */
+    .inp { background: #0a1628; border: 1px solid rgba(255,255,255,.1); color: var(--text); border-radius: 10px; padding: 10px 14px; width: 100%; outline: none; font-size: 13px; transition: border-color .18s; font-family: inherit; }
+    .inp:focus { border-color: #3b82f6; }
+    select.inp { appearance: none; }
+    textarea.inp { resize: vertical; min-height: 80px; }
+
+    /* ---- Status badges ---- */
+    .sbadge { font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 3px 9px; border-radius: 99px; text-transform: uppercase; }
+    .s-pendente              { background: rgba(245,158,11,.15); color: #fbbf24; }
+    .s-aguardando_confirmacao{ background: rgba(59,130,246,.15); color: #60a5fa; }
+    .s-confirmado, .s-ativo  { background: rgba(34,197,94,.12); color: #4ade80; }
+    .s-rejeitado, .s-suspenso{ background: rgba(239,68,68,.12); color: #f87171; }
+    .s-fechado               { background: rgba(100,116,139,.15); color: #94a3b8; }
+    .s-aguardando_sa         { background: rgba(245,158,11,.15); color: #fbbf24; }
+    .s-aguardando_cliente    { background: rgba(59,130,246,.15); color: #60a5fa; }
+
+    /* ---- Tables ---- */
+    .tbl { width: 100%; border-collapse: collapse; }
+    .tbl th { padding: 11px 16px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--subtle); border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .tbl td { padding: 13px 16px; border-bottom: 1px solid rgba(255,255,255,.04); font-size: 13px; vertical-align: middle; }
+    .tbl tbody tr:last-child td { border-bottom: none; }
+    .tbl tbody tr:hover td { background: rgba(255,255,255,.02); }
+    .tbl-wrap { overflow-x: auto; }
+
+    /* ---- Sections ---- */
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* ---- Modal ---- */
+    #modal { position: fixed; inset: 0; background: rgba(0,0,0,.82); backdrop-filter: blur(6px); z-index: 200; display: none; align-items: center; justify-content: center; padding: 20px; }
+    #modal.open { display: flex; }
+    #modal-box { background: #0a1628; border: 1px solid rgba(255,255,255,.1); border-radius: 22px; max-width: 520px; width: 100%; padding: 32px; max-height: 90vh; overflow-y: auto; }
+
+    /* ---- Animations ---- */
+    @keyframes fadeSlide { from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)} }
+    .anim { animation: fadeSlide .28s ease forwards; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .spin { animation: spin 1s linear infinite; display: inline-block; }
+
+    /* ---- Avatar ---- */
+    .avatar { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; flex-shrink: 0; background: #1e293b; color: #94a3b8; }
+
+    /* ---- Email preview ---- */
+    .email-preview { background: #030712; border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 16px; font-size: 12px; line-height: 1.6; color: #94a3b8; max-height: 180px; overflow-y: auto; }
+    .email-preview strong { color: #f1f5f9; }
+
+    /* ---- Chart container ---- */
+    .chart-wrap { position: relative; height: 200px; }
+  </style>
+</head>
+<body>
+
+<div id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<!-- LOGIN -->
+<div id="login-screen" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:#030712">
+  <div class="w-full max-w-xs anim">
+    <div class="text-center mb-10">
+      <div class="text-5xl font-black text-blue-500 tracking-tight mb-1">PDVo</div>
+      <span class="text-[10px] font-black text-slate-600 uppercase tracking-[.35em]">SuperAdmin Panel</span>
+    </div>
+    <div class="card p-7 shadow-2xl">
+      <h2 class="font-bold text-slate-200 mb-6 text-base">Acesso Restrito</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">E-mail</label>
+          <input id="sa-email" type="email" class="inp" placeholder="superadmin@pdvo.local" autocomplete="off">
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Senha</label>
+          <input id="sa-senha" type="password" class="inp" placeholder="••••••••">
+        </div>
+        <button onclick="saLogin()" id="btn-sa-login" class="btn btn-blue w-full mt-2 py-3">Entrar como SuperAdmin</button>
+        <p id="sa-err" class="text-red-400 text-xs text-center hidden bg-red-500/10 rounded-lg p-2"></p>
+      </div>
+      <div class="mt-5 pt-4 border-t border-white/5 text-center">
+        <a href="login.html" class="text-xs text-slate-600 hover:text-slate-400 transition-colors">← Voltar ao login normal</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sa-sidebar">
+  <div class="px-6 py-6 border-b border-white/5">
+    <div class="text-2xl font-black text-blue-400 tracking-tight">PDVo</div>
+    <div class="text-[9px] font-black text-slate-600 uppercase tracking-[.3em] mt-0.5">Super Admin</div>
+  </div>
+  <nav class="flex-1 py-5 space-y-0.5 overflow-y-auto">
+    <a class="nav-item active" onclick="showSection('dashboard')" id="nav-dashboard">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      Dashboard
+    </a>
+    <a class="nav-item" onclick="showSection('pedidos')" id="nav-pedidos">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      Pedidos
+      <span class="n-badge" id="badge-pendentes" style="display:none">0</span>
+    </a>
+    <a class="nav-item" onclick="showSection('clientes')" id="nav-clientes">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      Clientes
+    </a>
+    <a class="nav-item" onclick="showSection('suporte')" id="nav-suporte">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+      Suporte
+      <span class="n-badge" id="badge-suporte" style="display:none">0</span>
+    </a>
+    <a class="nav-item" onclick="showSection('emails')" id="nav-emails">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+      E-mails
+    </a>
+    <a class="nav-item" onclick="showSection('config')" id="nav-config">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      Configurações
+    </a>
+  </nav>
+  <div class="p-5 border-t border-white/5">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-9 h-9 rounded-full bg-blue-600/25 flex items-center justify-center text-blue-400 font-black text-sm flex-shrink-0">S</div>
+      <div class="min-w-0">
+        <p class="text-sm font-bold text-slate-300 truncate" id="sa-nome">SuperAdmin</p>
+        <p class="text-[10px] text-slate-600">Acesso Total</p>
+      </div>
+    </div>
+    <button onclick="saLogout()" class="btn btn-ghost w-full text-xs py-2.5">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+      Sair
+    </button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main-wrapper">
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="flex items-center gap-3">
+      <button onclick="toggleSidebar()" class="hamburger btn btn-ghost p-2" aria-label="Menu">
+        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div>
+        <h1 class="text-base font-black text-slate-100 leading-tight" id="page-title">Dashboard</h1>
+        <p class="text-[11px] text-slate-600 mt-0.5 hidden sm:block" id="page-sub">Visão geral do sistema</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 sm:gap-3">
+      <span id="topbar-alert" class="hidden items-center gap-2 bg-amber-500/15 border border-amber-500/25 text-amber-400 text-xs font-bold px-4 py-2 rounded-full">
+        <span class="w-2 h-2 bg-amber-400 rounded-full animate-pulse inline-block"></span>
+        <span id="topbar-alert-text">0 pedidos aguardando</span>
+      </span>
+      <button onclick="refreshAll()" class="btn btn-ghost text-xs px-4 py-2.5">
+        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Atualizar
+      </button>
+    </div>
+  </div>
+
+  <div class="page-body">
+
+    <!-- ===== DASHBOARD ===== -->
+    <div id="section-dashboard" class="section active anim">
+      <div class="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-7">
+        <div class="stat-card">
+          <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-2">Clientes Ativos</p>
+          <p class="text-3xl font-black text-white" id="stat-clientes">—</p>
+          <p class="text-xs text-slate-600 mt-1">empresas ativas</p>
+        </div>
+        <div class="stat-card" style="border-color:rgba(245,158,11,.2)">
+          <p class="text-[10px] text-amber-500 uppercase font-bold tracking-widest mb-2">⏳ Aguardando</p>
+          <p class="text-3xl font-black text-amber-400" id="stat-pendentes">—</p>
+          <p class="text-xs text-slate-600 mt-1">pedidos pendentes</p>
+        </div>
+        <div class="stat-card">
+          <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-2">Total Pedidos</p>
+          <p class="text-3xl font-black text-white" id="stat-pedidos">—</p>
+          <p class="text-xs text-slate-600 mt-1">todos os tempos</p>
+        </div>
+        <div class="stat-card" style="border-color:rgba(34,197,94,.15)">
+          <p class="text-[10px] text-green-500 uppercase font-bold tracking-widest mb-2">💰 Receita</p>
+          <p class="text-3xl font-black text-green-400" id="stat-receita">—</p>
+          <p class="text-xs text-slate-600 mt-1">confirmados</p>
+        </div>
+        <div class="stat-card" style="border-color:rgba(59,130,246,.2)">
+          <p class="text-[10px] text-blue-500 uppercase font-bold tracking-widest mb-2">🎟 Suporte</p>
+          <p class="text-3xl font-black text-blue-400" id="stat-suporte">—</p>
+          <p class="text-xs text-slate-600 mt-1">tickets abertos</p>
+        </div>
+        <div class="stat-card" style="border-color:rgba(34,197,94,.25)">
+          <p class="text-[10px] text-green-400 uppercase font-bold tracking-widest mb-2">🟢 Online Agora</p>
+          <p class="text-3xl font-black text-green-300" id="stat-online">—</p>
+          <p class="text-xs text-slate-600 mt-1">usuários ativos</p>
+        </div>
+      </div>
+
+      <!-- Mimo / Ações Rápidas -->
+      <div class="flex items-center justify-between mb-6 mt-1 px-1">
+        <p class="text-xs text-slate-600">Ações rápidas para clientes</p>
+        <button onclick="abrirMimo()" class="btn btn-sm" style="background:linear-gradient(135deg,rgba(134,239,172,.12),rgba(52,211,153,.08));border-color:rgba(134,239,172,.25);color:#86efac;font-weight:700;gap:6px;">
+          🎁 Dar Mimo
+        </button>
+      </div>
+
+      <!-- Charts row -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-7">
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-slate-200 text-sm">Receita — Últimos 30 dias</h3>
+            <div class="flex gap-1">
+              <button onclick="loadCharts('week')"  id="ch-btn-week"  class="btn btn-blue  btn-sm text-[10px]">7d</button>
+              <button onclick="loadCharts('month')" id="ch-btn-month" class="btn btn-ghost btn-sm text-[10px]">30d</button>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-receita"></canvas></div>
+        </div>
+        <div class="card p-5">
+          <h3 class="font-bold text-slate-200 text-sm mb-4">Pedidos por Status</h3>
+          <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Recent pedidos -->
+      <div class="card overflow-hidden">
+        <div class="flex items-center justify-between px-7 py-5 border-b border-white/5">
+          <div>
+            <h3 class="font-bold text-slate-200">Últimos Pedidos</h3>
+            <p class="text-xs text-slate-600 mt-0.5">Atividade recente</p>
+          </div>
+          <button onclick="showSection('pedidos')" class="btn btn-ghost btn-sm">Ver todos →</button>
+        </div>
+        <div id="recent-pedidos-list"></div>
+      </div>
+    </div>
+
+    <!-- ===== PEDIDOS ===== -->
+    <div id="section-pedidos" class="section">
+      <div class="flex gap-2 mb-5 flex-wrap items-center">
+        <button onclick="filtrarPedidos('todos')"                  class="btn btn-blue  btn-sm" id="filtro-todos">Todos</button>
+        <button onclick="filtrarPedidos('pendente')"               class="btn btn-ghost btn-sm" id="filtro-pendente">⏳ Pendente</button>
+        <button onclick="filtrarPedidos('aguardando_confirmacao')" class="btn btn-ghost btn-sm" id="filtro-aguardando">🔔 Aguardando</button>
+        <button onclick="filtrarPedidos('confirmado')"             class="btn btn-ghost btn-sm" id="filtro-confirmado">✅ Confirmado</button>
+        <button onclick="filtrarPedidos('rejeitado')"              class="btn btn-ghost btn-sm" id="filtro-rejeitado">❌ Rejeitado</button>
+        <div class="ml-auto">
+          <button onclick="limparRejeitados()" class="btn btn-ghost btn-sm text-red-400 border-red-800/40">🗑 Limpar Rejeitados</button>
+        </div>
+      </div>
+      <div id="pedidos-list" class="space-y-4">
+        <div class="p-10 text-center text-slate-600 text-sm">Carregando...</div>
+      </div>
+    </div>
+
+    <!-- ===== CLIENTES ===== -->
+    <div id="section-clientes" class="section">
+      <div class="card overflow-hidden">
+        <div class="flex items-center justify-between px-7 py-5 border-b border-white/5 flex-wrap gap-3">
+          <div>
+            <h3 class="font-bold text-slate-200">Empresas Cadastradas</h3>
+            <p class="text-xs text-slate-600 mt-0.5">Todos os tenants do sistema</p>
+          </div>
+          <input id="busca-cliente" oninput="filtrarClientes()" type="text" placeholder="Buscar..." class="inp w-48 py-2 text-sm">
+        </div>
+        <div class="tbl-wrap">
+          <div id="clientes-list">
+            <div class="p-10 text-center text-slate-600 text-sm">Carregando...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SUPORTE ===== -->
+    <div id="section-suporte" class="section">
+      <div class="card overflow-hidden">
+        <div class="flex items-center justify-between px-7 py-5 border-b border-white/5 flex-wrap gap-3">
+          <div>
+            <h3 class="font-bold text-slate-200">Tickets de Suporte</h3>
+            <p class="text-xs text-slate-600 mt-0.5">Chamados abertos pelos clientes</p>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="filtrarTickets('todos')"            class="btn btn-blue  btn-sm" id="stf-todos">Todos</button>
+            <button onclick="filtrarTickets('aguardando_sa')"   class="btn btn-ghost btn-sm" id="stf-aguardando">⏳ Aguardando</button>
+            <button onclick="filtrarTickets('aguardando_cliente')" class="btn btn-ghost btn-sm" id="stf-respondido">💬 Respondido</button>
+            <button onclick="filtrarTickets('fechado')"         class="btn btn-ghost btn-sm" id="stf-fechado">✓ Fechado</button>
+            <button onclick="loadSuporte()" class="btn btn-ghost btn-sm">↺</button>
+          </div>
+        </div>
+        <div id="suporte-list" class="tbl-wrap">
+          <div class="p-10 text-center text-slate-600 text-sm">Carregando...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== EMAILS ===== -->
+    <div id="section-emails" class="section">
+      <!-- Sub-tabs -->
+      <div class="flex gap-2 mb-5 flex-wrap">
+        <button id="email-tab-log"       onclick="switchEmailTab('log')"       class="btn btn-blue  btn-sm">📋 Log de Envios</button>
+        <button id="email-tab-compor"    onclick="switchEmailTab('compor')"    class="btn btn-ghost btn-sm">✉️ Compor E-mail</button>
+        <button id="email-tab-templates" onclick="switchEmailTab('templates')" class="btn btn-ghost btn-sm">📝 Templates</button>
+      </div>
+
+      <!-- Log -->
+      <div id="email-panel-log" class="card overflow-hidden">
+        <div class="flex items-center justify-between px-7 py-5 border-b border-white/5">
+          <div>
+            <h3 class="font-bold text-slate-200">Log de E-mails Enviados</h3>
+            <p class="text-xs text-slate-600 mt-0.5">Histórico de notificações do sistema</p>
+          </div>
+          <button onclick="loadEmailLog()" class="btn btn-ghost btn-sm">↺ Atualizar</button>
+        </div>
+        <div id="email-log-list" class="tbl-wrap">
+          <div class="p-10 text-center text-slate-600 text-sm">Carregando...</div>
+        </div>
+      </div>
+
+      <!-- Compor -->
+      <div id="email-panel-compor" class="hidden max-w-2xl">
+        <div class="card p-7">
+          <div class="flex items-start gap-4 mb-6">
+            <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-xl flex-shrink-0">✉️</div>
+            <div>
+              <h3 class="font-bold text-slate-200 text-sm mb-0.5">Compor E-mail Manual</h3>
+              <p class="text-xs text-slate-500 leading-relaxed">Envie um e-mail personalizado para qualquer cliente cadastrado.</p>
+            </div>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Usar Template (opcional)</label>
+              <select id="email-template-sel" class="inp" onchange="carregarTemplateNoCompor()">
+                <option value="">Selecione um template...</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Destinatário (cliente)</label>
+              <select id="email-dest-cliente" class="inp" onchange="preencherEmailDest()">
+                <option value="">Selecione um cliente...</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">E-mail de destino</label>
+              <input type="email" id="email-dest" class="inp" placeholder="cliente@email.com">
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Assunto</label>
+              <input type="text" id="email-assunto" class="inp" placeholder="Assunto do e-mail">
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Mensagem</label>
+              <textarea id="email-corpo" class="inp" rows="6" placeholder="Corpo do e-mail (texto simples ou HTML)"></textarea>
+            </div>
+            <div id="email-compor-status" class="hidden p-3 rounded-xl text-sm font-semibold text-center"></div>
+            <button onclick="enviarEmailManual()" id="btn-enviar-email" class="btn btn-blue w-full">Enviar E-mail</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Templates -->
+      <div id="email-panel-templates" class="hidden">
+        <div class="card overflow-hidden mb-5">
+          <div class="flex items-center justify-between px-7 py-5 border-b border-white/5 flex-wrap gap-3">
+            <div>
+              <h3 class="font-bold text-slate-200">Templates de E-mail</h3>
+              <p class="text-xs text-slate-600 mt-0.5">Crie mensagens reutilizáveis para o compositor</p>
+            </div>
+            <button onclick="abrirModalTemplate()" class="btn btn-blue btn-sm">+ Novo Template</button>
+          </div>
+          <div id="templates-list">
+            <div class="p-10 text-center text-slate-600 text-sm">Carregando...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== CONFIG ===== -->
+    <div id="section-config" class="section">
+      <div class="flex gap-2 mb-6 flex-wrap">
+        <button id="cfg-tab-geral"      onclick="switchCfgTab('geral')"      class="btn btn-blue  btn-sm">Geral</button>
+        <button id="cfg-tab-pix"        onclick="switchCfgTab('pix')"        class="btn btn-ghost btn-sm">PIX</button>
+        <button id="cfg-tab-cron"       onclick="switchCfgTab('cron')"       class="btn btn-ghost btn-sm">⏰ Cron</button>
+        <button id="cfg-tab-indicacoes" onclick="switchCfgTab('indicacoes')" class="btn btn-ghost btn-sm">🤝 Indicações</button>
+        <button id="cfg-tab-app"        onclick="switchCfgTab('app')"        class="btn btn-ghost btn-sm">📱 App</button>
+        <button id="cfg-tab-db"         onclick="switchCfgTab('db')"         class="btn btn-ghost btn-sm">🗄️ Banco de Dados</button>
+      </div>
+
+      <!-- GERAL -->
+      <div id="cfg-panel-geral">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
+          <div class="card p-7">
+            <h3 class="font-bold text-slate-200 text-sm mb-1">Alterar Senha</h3>
+            <p class="text-xs text-slate-600 mb-5">Senha de acesso ao painel SuperAdmin</p>
+            <div class="space-y-4">
+              <div>
+                <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Senha Atual</label>
+                <input type="password" class="inp" id="cfg-senha-atual" placeholder="••••••••">
+              </div>
+              <div>
+                <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Nova Senha</label>
+                <input type="password" class="inp" id="cfg-senha-nova" placeholder="mínimo 8 caracteres">
+              </div>
+              <button onclick="alterarSenha()" class="btn btn-blue w-full">Salvar Nova Senha</button>
+            </div>
+          </div>
+          <div class="card p-7">
+            <h3 class="font-bold text-slate-200 text-sm mb-1">Credenciais Padrão</h3>
+            <p class="text-xs text-slate-600 mb-5">Acesso inicial do sistema</p>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center bg-[#030712] rounded-xl px-4 py-3"><span class="text-xs text-slate-500">Login</span><code class="text-xs text-slate-300 font-mono">superadmin@pdvo.local</code></div>
+              <div class="flex justify-between items-center bg-[#030712] rounded-xl px-4 py-3"><span class="text-xs text-slate-500">Senha padrão</span><code class="text-xs text-slate-300 font-mono">super@2025</code></div>
+              <div class="flex justify-between items-center bg-[#030712] rounded-xl px-4 py-3"><span class="text-xs text-slate-500">Demo tenant</span><code class="text-xs text-slate-300 font-mono">slug: demo</code></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CRON -->
+      <div id="cfg-panel-cron" style="display:none" class="max-w-2xl">
+        <div class="card p-7">
+          <div class="flex items-start gap-4 mb-6">
+            <div class="w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-lg flex-shrink-0">⏰</div>
+            <div>
+              <h3 class="font-bold text-slate-200 text-sm mb-0.5">Alertas Automáticos de Vencimento</h3>
+              <p class="text-xs text-slate-500 leading-relaxed">O sistema envia e-mail 3 dias, 1 dia e no dia do vencimento da assinatura.</p>
+            </div>
+          </div>
+          <div class="mb-5">
+            <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-2">Cron via Linha de Comando</p>
+            <div class="bg-[#030712] rounded-xl p-4 font-mono text-xs text-green-400 overflow-x-auto">0 8 * * * php /home/<span class="text-yellow-400">SEU_USUARIO</span>/public_html/pdvo/api/cron_vencimento.php</div>
+          </div>
+          <div class="mb-6">
+            <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-2">Cron via URL</p>
+            <div class="bg-[#030712] rounded-xl p-4 font-mono text-xs text-blue-300 break-all" id="cron-url-display">
+              https://pdv.enxos.online/pdvo/api/cron_vencimento.php?token=<span class="text-yellow-400" id="cron-token-display">carregando...</span>
+            </div>
+          </div>
+          <div class="border-t border-white/5 pt-5">
+            <div id="cron-result" class="hidden bg-[#030712] rounded-xl p-4 text-xs font-mono text-slate-300 mb-4 max-h-48 overflow-y-auto whitespace-pre-wrap"></div>
+            <button onclick="testarCron()" id="btn-testar-cron" class="btn btn-blue w-full">▶ Executar Cron Agora (Teste)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- INDICAÇÕES -->
+      <div id="cfg-panel-indicacoes" style="display:none" class="max-w-3xl space-y-6">
+        <div class="card p-7">
+          <div class="flex items-start gap-4 mb-6">
+            <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-lg flex-shrink-0">🤝</div>
+            <div>
+              <h3 class="font-bold text-slate-200 text-sm mb-0.5">Sistema de Indicações</h3>
+              <p class="text-xs text-slate-500 leading-relaxed">Configure as recompensas e gerencie indicações.</p>
+            </div>
+          </div>
+          <div class="space-y-5">
+            <div class="flex items-center justify-between p-4 bg-[#030712] rounded-xl">
+              <div>
+                <p class="text-sm font-semibold text-slate-200">Ativar Sistema de Indicações</p>
+                <p class="text-[10px] text-slate-500 mt-0.5">Exibe o campo "Código de Indicação" na assinatura.</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
+                <input type="checkbox" id="cfg-ind-ativo" class="sr-only peer">
+                <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Descrição da Recompensa</label>
+              <input type="text" class="inp" id="cfg-ind-recompensa" placeholder="Ex: Desconto de 10% na próxima renovação">
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Valor da Recompensa (R$)</label>
+              <input type="number" class="inp" id="cfg-ind-valor" step="0.01" min="0" placeholder="0.00">
+              <p class="text-[10px] text-slate-600 mt-1">Valor em reais dado ao indicador quando a indicação é validada.</p>
+            </div>
+            <div id="cfg-ind-status" class="hidden p-3 rounded-xl text-sm font-semibold text-center"></div>
+            <button onclick="salvarConfigIndicacao()" id="btn-salvar-ind" class="btn btn-blue w-full">Salvar Configurações de Indicações</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="flex items-center justify-between px-7 py-5 border-b border-white/5">
+            <h3 class="font-bold text-slate-200 text-sm">Todas as Indicações</h3>
+            <button onclick="loadIndicacoes()" class="btn btn-ghost btn-sm">↺ Atualizar</button>
+          </div>
+          <div id="indicacoes-list" class="p-10 text-center text-slate-600 text-sm">Clique em Atualizar.</div>
+        </div>
+      </div>
+
+      <!-- APP -->
+      <div id="cfg-panel-app" style="display:none" class="max-w-2xl">
+        <div class="card p-7">
+          <div class="flex items-start gap-4 mb-6">
+            <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-lg flex-shrink-0">📱</div>
+            <div>
+              <h3 class="font-bold text-slate-200 text-sm mb-0.5">Aviso de Download do App</h3>
+              <p class="text-xs text-slate-500 leading-relaxed">Exibe modal na tela de login incentivando baixar o app.</p>
+            </div>
+          </div>
+          <div class="space-y-5">
+            <div class="flex items-center justify-between p-4 bg-[#030712] rounded-xl">
+              <div>
+                <p class="text-sm font-semibold text-slate-200">Exibir Modal no Login</p>
+                <p class="text-[10px] text-slate-500 mt-0.5">Aparece após o cliente carregar a tela de login.</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
+                <input type="checkbox" id="cfg-app-ativo" class="sr-only peer">
+                <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+              </label>
+            </div>
+            <div><label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Título</label><input type="text" class="inp" id="cfg-app-titulo" placeholder="Ex: Baixe nosso App!"></div>
+            <div><label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Mensagem</label><input type="text" class="inp" id="cfg-app-mensagem" placeholder="Ex: Tenha o sistema na palma da mão."></div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div><label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Link Android</label><input type="url" class="inp" id="cfg-app-android" placeholder="https://play.google.com/..."></div>
+              <div><label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Link iOS</label><input type="url" class="inp" id="cfg-app-ios" placeholder="https://apps.apple.com/..."></div>
+            </div>
+            <div id="cfg-app-status" class="hidden p-3 rounded-xl text-sm font-semibold text-center"></div>
+            <button onclick="salvarConfigApp()" id="btn-salvar-app" class="btn btn-blue w-full">Salvar Configurações do App</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PIX -->
+      <div id="cfg-panel-pix" style="display:none" class="max-w-2xl">
+        <div class="card p-7">
+          <div class="flex items-start gap-4 mb-6">
+            <div class="w-10 h-10 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center text-lg flex-shrink-0">⬡</div>
+            <div>
+              <h3 class="font-bold text-slate-200 text-sm mb-0.5">Configurações PIX</h3>
+              <p class="text-xs text-slate-500 leading-relaxed">Chave PIX que aparece no QR Code dos clientes.</p>
+            </div>
+          </div>
+          <div class="space-y-5">
+            <div><label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Chave PIX</label><input type="text" class="inp" id="cfg-pix-chave" placeholder="CPF, e-mail, celular ou chave aleatória"></div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div><label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Nome do Beneficiário</label><input type="text" class="inp" id="cfg-pix-nome" placeholder="Ex: João Silva" maxlength="25"></div>
+              <div><label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Cidade</label><input type="text" class="inp" id="cfg-pix-cidade" placeholder="Ex: SAO PAULO" maxlength="15"></div>
+            </div>
+            <div class="border-t border-white/5 pt-5">
+              <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Notificações por E-mail</h4>
+              <div class="space-y-4">
+                <div><label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">E-mail de Notificação (SA)</label><input type="email" class="inp" id="cfg-pix-email-notif" placeholder="seuemail@dominio.com.br"></div>
+                <div><label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">E-mail Remetente</label><input type="email" class="inp" id="cfg-pix-email-rem" placeholder="noreply@seudominio.com.br"></div>
+              </div>
+            </div>
+            <div id="cfg-pix-status" class="hidden p-3 rounded-xl text-sm font-semibold text-center"></div>
+            <button onclick="salvarConfigPix()" id="btn-salvar-pix" class="btn btn-blue w-full">Salvar Configurações PIX</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DB -->
+      <div id="cfg-panel-db" style="display:none" class="max-w-2xl space-y-5">
+        <!-- Driver selector -->
+        <div class="card p-7">
+          <div class="flex items-start gap-4 mb-5">
+            <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-lg flex-shrink-0">⚙️</div>
+            <div>
+              <h3 class="font-bold text-slate-200 text-sm mb-0.5">Driver de Banco de Dados</h3>
+              <p class="text-xs text-slate-500 leading-relaxed">Selecione qual banco o sistema deve usar. A alteração exige que o servidor seja reiniciado.</p>
+            </div>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Driver Ativo</label>
+              <select id="db-driver-sel" class="inp">
+                <option value="sqlite">SQLite (padrão — sem configuração extra)</option>
+                <option value="mysql">MySQL / MariaDB (requer credenciais configuradas)</option>
+                <option value="both">Ambos — SQLite + MySQL (modo espelho)</option>
+              </select>
+            </div>
+            <div id="db-driver-status" class="hidden p-3 rounded-xl text-sm font-semibold text-center"></div>
+            <button onclick="salvarDriver()" id="btn-salvar-driver" class="btn btn-blue w-full">💾 Salvar Driver</button>
+          </div>
+        </div>
+
+        <!-- Stats + Backup -->
+        <div class="card p-7">
+          <div class="flex items-start gap-4 mb-6">
+            <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-lg flex-shrink-0">🗄️</div>
+            <div>
+              <h3 class="font-bold text-slate-200 text-sm mb-0.5">Informações do Banco de Dados</h3>
+              <p class="text-xs text-slate-500 leading-relaxed">Estatísticas e opções de backup do banco de dados principal.</p>
+            </div>
+          </div>
+          <div id="db-stats-box" class="space-y-3 mb-6">
+            <div class="p-10 text-center text-slate-600 text-sm">Carregando...</div>
+          </div>
+          <button onclick="loadDbStats()" class="btn btn-ghost w-full mb-3">↺ Atualizar Estatísticas</button>
+          <button onclick="downloadBackup()" id="btn-backup" class="btn btn-blue w-full">⬇ Exportar Backup (SQL)</button>
+          <p class="text-[10px] text-slate-600 mt-2 text-center">O backup inclui a estrutura e dados do banco principal.</p>
+        </div>
+      </div>
+
+    </div><!-- /section-config -->
+
+  </div><!-- /page-body -->
+</div><!-- /main-wrapper -->
+
+<!-- MODAL GLOBAL -->
+<div id="modal">
+  <div id="modal-box" class="anim">
+    <h3 class="font-black text-xl text-slate-100 mb-1" id="modal-title">Confirmar Ação</h3>
+    <p class="text-slate-500 text-sm mb-5 leading-relaxed" id="modal-desc">Tem certeza?</p>
+    <div id="modal-extra" class="mb-4"></div>
+    <div class="flex gap-3 mt-2">
+      <button onclick="closeModal()" class="btn btn-ghost flex-1">Cancelar</button>
+      <button id="modal-confirm-btn" class="btn flex-1">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-root" class="fixed top-4 right-4 z-[999] flex flex-col gap-2.5 pointer-events-none"></div>
+
+<script>
+  // ============================================================
+  // STATE
+  // ============================================================
+  let allPedidos   = [], allClientes = [], allTickets = [];
+  let pedidoFiltro = 'todos', ticketFiltro = 'todos';
+  let _modalCb     = null;
+  let _chartReceita = null, _chartStatus = null;
+  let _chartPeriod  = 'week';
+
+  // ============================================================
+  // AUTH
+  // ============================================================
+  async function saLogin() {
+    const email = document.getElementById('sa-email').value.trim();
+    const senha = document.getElementById('sa-senha').value;
+    const btn   = document.getElementById('btn-sa-login');
+    const err   = document.getElementById('sa-err');
+    if (!email || !senha) { showToast('Preencha e-mail e senha.', 'red'); return; }
+    btn.disabled = true; btn.innerHTML = '<span class="spin">⟳</span> Autenticando...';
+    err.classList.add('hidden');
+    try {
+      const res = await api('superadmin.php?action=login', 'POST', { email, senha });
+      if (!res.ok) throw new Error(res.data.error || 'Falha no login');
+      document.getElementById('sa-nome').textContent = res.data.nome || 'SuperAdmin';
+      document.getElementById('login-screen').style.display = 'none';
+      refreshAll();
+    } catch (e) {
+      err.textContent = e.message;
+      err.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Entrar como SuperAdmin';
+    }
+  }
+
+  async function saLogout() {
+    await api('superadmin.php?action=logout', 'POST', {});
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.getElementById('login-screen').style.display !== 'none') saLogin();
+  });
+
+  // ============================================================
+  // NAVIGATION
+  // ============================================================
+  const SECTIONS = ['dashboard','pedidos','clientes','suporte','emails','config'];
+  const TITLES   = {
+    dashboard : ['Dashboard',           'Visão geral do sistema'],
+    pedidos   : ['Pedidos de Ativação', 'Gerencie e confirme pagamentos'],
+    clientes  : ['Gestão de Clientes',  'Todos os tenants cadastrados'],
+    suporte   : ['Tickets de Suporte',  'Chamados abertos pelos clientes'],
+    emails    : ['E-mails',             'Log e envio de e-mails'],
+    config    : ['Configurações',       'Preferências do painel SuperAdmin'],
+  };
+
+  function showSection(name) {
+    SECTIONS.forEach(s => {
+      document.getElementById(`section-${s}`).classList.toggle('active', s === name);
+      document.getElementById(`nav-${s}`)?.classList.toggle('active', s === name);
+    });
+    const [title, sub] = TITLES[name] || [name, ''];
+    document.getElementById('page-title').textContent = title;
+    document.getElementById('page-sub').textContent   = sub;
+    if (name === 'pedidos')  loadPedidos();
+    if (name === 'clientes') { loadClientes(); }
+    if (name === 'suporte')  loadSuporte();
+    if (name === 'emails')   { switchEmailTab('log'); }
+    if (name === 'config')   switchCfgTab('geral');
+    closeSidebar();
+  }
+
+  function toggleSidebar() {
+    const sb = document.getElementById('sa-sidebar');
+    const ov = document.getElementById('sidebar-overlay');
+    const open = sb.classList.toggle('open');
+    ov.classList.toggle('open', open);
+    document.body.style.overflow = open ? 'hidden' : '';
+  }
+  function closeSidebar() {
+    document.getElementById('sa-sidebar').classList.remove('open');
+    document.getElementById('sidebar-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  // ============================================================
+  // DASHBOARD
+  // ============================================================
+  async function loadDashboard() {
+    try {
+      const res = await api('superadmin.php?action=dashboard');
+      if (!res.ok) return;
+      const d = res.data;
+      set('stat-clientes',  d.total_clientes);
+      set('stat-pendentes', d.pedidos_pendentes);
+      set('stat-pedidos',   d.total_pedidos);
+      set('stat-receita',   'R$ ' + fmtMoney(d.receita_confirmada || 0));
+      set('stat-suporte',   d.tickets_abertos ?? '—');
+      set('stat-online',    d.online_users ?? 0);
+
+      const badge    = document.getElementById('badge-pendentes');
+      const topAlert = document.getElementById('topbar-alert');
+      if (d.pedidos_pendentes > 0) {
+        badge.style.display = 'inline-flex'; badge.textContent = d.pedidos_pendentes;
+        topAlert.classList.remove('hidden'); topAlert.classList.add('flex');
+        document.getElementById('topbar-alert-text').textContent = `${d.pedidos_pendentes} pedido${d.pedidos_pendentes>1?'s':''} aguardando`;
+      } else {
+        badge.style.display = 'none';
+        topAlert.classList.add('hidden'); topAlert.classList.remove('flex');
+      }
+
+      if (d.tickets_abertos > 0) {
+        const bs = document.getElementById('badge-suporte');
+        bs.style.display = 'inline-flex'; bs.textContent = d.tickets_abertos;
+      }
+
+      renderRecentPedidos(d.recent_pedidos || []);
+      loadCharts(_chartPeriod);
+    } catch {}
+  }
+
+  function renderRecentPedidos(pedidos) {
+    const el = document.getElementById('recent-pedidos-list');
+    if (!pedidos.length) { el.innerHTML = '<p class="p-8 text-center text-slate-600 text-sm">Nenhum pedido ainda.</p>'; return; }
+    el.innerHTML = pedidos.map(p => `
+      <div class="flex items-center gap-4 px-7 py-4 border-b border-white/[.04] last:border-0 hover:bg-white/[.02] transition-colors flex-wrap">
+        <div class="avatar">${(p.razao_social||'X').charAt(0).toUpperCase()}</div>
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-slate-200 truncate">${escHtml(p.razao_social)}</p>
+          <p class="text-[11px] text-slate-500 truncate">${escHtml(p.email)}</p>
+        </div>
+        <div class="text-right hidden sm:block">
+          <span class="sbadge s-${p.status}">${statusLabel(p.status)}</span>
+          <p class="text-[10px] text-slate-600 mt-1">${fmtDate(p.created_at)}</p>
+        </div>
+        <div class="text-right">
+          <p class="font-black text-green-400">R$ ${fmtMoney(p.valor)}</p>
+          <p class="text-[10px] text-slate-500">${p.plano_nome}</p>
+        </div>
+        ${canConfirm(p.status) ? `<button onclick="abrirConfirmar(${p.id},'${escAttr(p.razao_social)}','${p.plano_nome}',${p.valor},'${escAttr(p.email)}','${escAttr(p.nome)}')" class="btn btn-green btn-sm flex-shrink-0">✓ Ativar</button>` : ''}
+      </div>
+    `).join('');
+  }
+
+  async function loadCharts(period) {
+    _chartPeriod = period;
+    ['week','month'].forEach(p => {
+      const btn = document.getElementById(`ch-btn-${p}`);
+      if (!btn) return;
+      btn.className = p === period ? 'btn btn-blue btn-sm text-[10px]' : 'btn btn-ghost btn-sm text-[10px]';
+    });
+    try {
+      const res = await api(`superadmin.php?action=chart_data&period=${period}`);
+      if (!res.ok) return;
+      const d = res.data;
+      renderChartReceita(d.labels || [], d.receita || []);
+      renderChartStatus(d.status_counts || {});
+    } catch {}
+  }
+
+  function renderChartReceita(labels, data) {
+    const ctx = document.getElementById('chart-receita');
+    if (!ctx) return;
+    if (_chartReceita) { _chartReceita.destroy(); }
+    _chartReceita = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Receita Confirmada (R$)',
+          data,
+          backgroundColor: 'rgba(37,99,235,.7)',
+          borderRadius: 8,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#64748b', font:{size:10} }, grid: { color: 'rgba(255,255,255,.04)' } },
+          y: { ticks: { color: '#64748b', font:{size:10}, callback: v => 'R$'+v }, grid: { color: 'rgba(255,255,255,.05)' } }
+        }
+      }
+    });
+  }
+
+  function renderChartStatus(counts) {
+    const ctx = document.getElementById('chart-status');
+    if (!ctx) return;
+    if (_chartStatus) { _chartStatus.destroy(); }
+    const labels = ['Pendente', 'Aguardando', 'Confirmado', 'Rejeitado'];
+    const vals   = [counts.pendente||0, counts.aguardando_confirmacao||0, counts.confirmado||0, counts.rejeitado||0];
+    const colors = ['#f59e0b','#60a5fa','#4ade80','#f87171'];
+    _chartStatus = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{ data: vals, backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font:{size:11}, padding: 12 } } },
+        cutout: '65%',
+      }
+    });
+  }
+
+  // ============================================================
+  // PEDIDOS
+  // ============================================================
+  async function loadPedidos() {
+    const el = document.getElementById('pedidos-list');
+    el.innerHTML = '<div class="p-10 text-center text-slate-600 text-sm">Carregando...</div>';
+    try {
+      const st  = pedidoFiltro !== 'todos' ? `&status=${pedidoFiltro}` : '';
+      const res = await api(`superadmin.php?action=pedidos${st}`);
+      allPedidos = res.data.pedidos || [];
+      renderPedidos(allPedidos);
+    } catch {
+      el.innerHTML = '<p class="p-8 text-red-400 text-sm text-center">Erro ao carregar pedidos.</p>';
+    }
+  }
+
+  function renderPedidos(pedidos) {
+    const el = document.getElementById('pedidos-list');
+    if (!pedidos.length) { el.innerHTML = '<p class="p-10 text-center text-slate-600">Nenhum pedido encontrado.</p>'; return; }
+    el.innerHTML = pedidos.map(p => `
+      <div class="pedido-card ${canConfirm(p.status)?'highlight':''}">
+        <div class="flex items-center gap-4 px-7 py-5 border-b border-white/[.05] flex-wrap">
+          <div class="avatar text-lg">${(p.razao_social||'X').charAt(0).toUpperCase()}</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-3 flex-wrap">
+              <p class="font-bold text-slate-100 text-base">${escHtml(p.razao_social)}</p>
+              <span class="sbadge s-${p.status}">${statusLabel(p.status)}</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">Pedido em ${fmtDate(p.created_at)}</p>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <p class="text-2xl font-black text-green-400">R$ ${fmtMoney(p.valor)}</p>
+            <p class="text-xs text-slate-500">${p.plano_nome}</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-0 divide-x divide-white/[.04]">
+          <div class="px-6 py-4"><p class="text-[10px] text-slate-600 uppercase font-bold tracking-widest mb-1">Responsável</p><p class="text-sm text-slate-300 font-semibold">${escHtml(p.nome)}</p></div>
+          <div class="px-6 py-4"><p class="text-[10px] text-slate-600 uppercase font-bold tracking-widest mb-1">E-mail</p><p class="text-sm text-slate-300 break-all">${escHtml(p.email)}</p></div>
+          <div class="px-6 py-4"><p class="text-[10px] text-slate-600 uppercase font-bold tracking-widest mb-1">WhatsApp</p><p class="text-sm text-slate-300">${escHtml(p.whatsapp||'—')}</p></div>
+          <div class="px-6 py-4"><p class="text-[10px] text-slate-600 uppercase font-bold tracking-widest mb-1">Referência</p><p class="text-xs text-slate-400 font-mono">${p.ref||'—'}</p>${p.observacoes?`<p class="text-[10px] text-slate-600 mt-1">${escHtml(p.observacoes)}</p>`:''}</div>
+        </div>
+        ${canConfirm(p.status) ? `
+          <div class="flex items-center gap-3 px-7 py-4 bg-blue-500/[.04] border-t border-blue-500/10 flex-wrap">
+            <svg class="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <p class="text-xs text-slate-400 flex-1">Aguardando verificação do pagamento PIX</p>
+            <button onclick="abrirConfirmar(${p.id},'${escAttr(p.razao_social)}','${p.plano_nome}',${p.valor},'${escAttr(p.email)}','${escAttr(p.nome)}')" class="btn btn-green btn-sm">✓ Confirmar e Ativar</button>
+            <button onclick="abrirRejeitar(${p.id},'${escAttr(p.razao_social)}')" class="btn btn-red btn-sm">✕ Rejeitar</button>
+          </div>` : `
+          <div class="px-7 py-3 border-t border-white/[.04]">
+            ${p.status==='confirmado'?'<p class="text-xs text-green-500 font-bold">✓ Pagamento confirmado — Cliente ativado</p>':''}
+            ${p.status==='rejeitado' ?'<p class="text-xs text-red-400 font-bold">✕ Pedido rejeitado</p>':''}
+          </div>`}
+      </div>
+    `).join('');
+  }
+
+  function filtrarPedidos(status) {
+    pedidoFiltro = status;
+    ['todos','pendente','aguardando','confirmado','rejeitado'].forEach(f => {
+      const btn = document.getElementById(`filtro-${f}`);
+      if (btn) { btn.className = 'btn btn-ghost btn-sm'; }
+    });
+    const map = { todos:'todos', pendente:'pendente', aguardando_confirmacao:'aguardando', confirmado:'confirmado', rejeitado:'rejeitado' };
+    document.getElementById(`filtro-${map[status]||status}`)?.classList.replace('btn-ghost','btn-blue');
+    loadPedidos();
+  }
+
+  function limparRejeitados() {
+    openModal('Limpar Pedidos Rejeitados',
+      'Todos os pedidos com status <strong style="color:#f1f5f9">Rejeitado</strong> serão removidos permanentemente. Essa ação não pode ser desfeita.',
+      'btn-red', '🗑 Limpar', async () => {
+        const res = await api('superadmin.php?action=limpar_rejeitados', 'POST', {});
+        if (res.ok) { showToast(`✅ ${res.data.removidos} pedido(s) removido(s).`, 'green'); loadPedidos(); }
+        else showToast(res.data.error || 'Erro.', 'red');
+      });
+  }
+
+  // ============================================================
+  // CLIENTES
+  // ============================================================
+  async function loadClientes() {
+    const el = document.getElementById('clientes-list');
+    el.innerHTML = '<div class="p-10 text-center text-slate-600 text-sm">Carregando...</div>';
+    try {
+      const res = await api('superadmin.php?action=clientes');
+      allClientes = res.data.clientes || [];
+      renderClientes(allClientes);
+    } catch { el.innerHTML = '<p class="p-8 text-red-400 text-sm text-center">Erro.</p>'; }
+  }
+
+  function renderClientes(list) {
+    const el = document.getElementById('clientes-list');
+    if (!list.length) { el.innerHTML = '<p class="p-10 text-center text-slate-600">Nenhum cliente.</p>'; return; }
+    el.innerHTML = `
+      <table class="tbl">
+        <thead><tr>
+          <th>Empresa</th><th>Responsável</th><th>Contato</th><th>Plano</th><th>Vencimento</th><th>Status</th><th class="text-right">Ações</th>
+        </tr></thead>
+        <tbody>
+          ${list.map(c => `
+            <tr>
+              <td><p class="font-semibold text-slate-200">${escHtml(c.razao_social)}</p><code class="text-[10px] text-slate-600">${c.slug}</code></td>
+              <td class="text-slate-300">${escHtml(c.nome_resp||c.nome||'—')}</td>
+              <td><p class="text-slate-400 text-xs">${escHtml(c.email||'—')}</p><p class="text-slate-500 text-[11px]">${escHtml(c.whatsapp||'—')}</p></td>
+              <td><span class="font-bold text-blue-400 text-xs">${c.plano_nome||'—'}</span></td>
+              <td class="text-slate-400 text-xs">${fmtDate(c.data_vencimento,true)}</td>
+              <td><span class="sbadge s-${c.status}">${c.status}</span></td>
+              <td class="text-right">
+                <div class="flex gap-1 justify-end flex-wrap">
+                  <button onclick="abrirEditarCliente('${escAttr(c.slug)}','${escAttr(c.razao_social)}','${escAttr(c.plano_nome||'')}','${escAttr(c.data_vencimento||'')}','${escAttr(c.email||'')}')" class="btn btn-ghost btn-sm">✏️ Editar</button>
+                  ${c.status==='ativo'
+                    ? `<button onclick="suspenderTenant('${c.slug}','${escAttr(c.razao_social)}')" class="btn btn-red btn-sm">Suspender</button>`
+                    : `<button onclick="reativarTenant('${c.slug}','${escAttr(c.razao_social)}')" class="btn btn-green btn-sm">Reativar</button>`}
+                </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  function filtrarClientes() {
+    const q = document.getElementById('busca-cliente').value.toLowerCase();
+    renderClientes(allClientes.filter(c =>
+      (c.razao_social||'').toLowerCase().includes(q) || c.slug.includes(q) || (c.email||'').toLowerCase().includes(q)
+    ));
+  }
+
+  function abrirEditarCliente(slug, razao, plano, vencimento, email) {
+    document.getElementById('modal-extra').innerHTML = `
+      <div class="space-y-3">
+        <div>
+          <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1">Empresa</label>
+          <p class="text-slate-200 font-bold">${escHtml(razao)} <code class="text-slate-500 font-mono text-xs">(${escHtml(slug)})</code></p>
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1">Plano</label>
+          <input type="text" id="edit-plano" class="inp text-sm" value="${escHtml(plano)}" placeholder="Basic / PRO / Super / Ultra">
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1">Novo Vencimento</label>
+          <input type="date" id="edit-venc" class="inp text-sm" value="${(vencimento||'').split(' ')[0]}">
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1">Adicionar dias à assinatura</label>
+          <input type="number" id="edit-dias" class="inp text-sm" placeholder="Ex: 30 (adiciona 30 dias)" min="0" step="1">
+          <p class="text-[10px] text-slate-600 mt-1">Deixe em branco para usar a data acima diretamente.</p>
+        </div>
+      </div>`;
+    openModal('Editar Cliente', `Alterar plano e vencimento de <strong style="color:#f1f5f9">${escHtml(razao)}</strong>`,
+      'btn-blue', '💾 Salvar Alterações',
+      async () => {
+        const novoPlano = document.getElementById('edit-plano')?.value.trim();
+        const novoVenc  = document.getElementById('edit-venc')?.value.trim();
+        const dias      = parseInt(document.getElementById('edit-dias')?.value||'0')||0;
+        const res = await api('superadmin.php?action=editar_cliente', 'POST', { tenant_slug: slug, plano_nome: novoPlano, data_vencimento: novoVenc, adicionar_dias: dias });
+        if (res.ok) { showToast('✅ Cliente atualizado!', 'green'); loadClientes(); }
+        else showToast(res.data.error || 'Erro.', 'red');
+      });
+  }
+
+  // ============================================================
+  // SUPORTE
+  // ============================================================
+  async function loadSuporte() {
+    const el = document.getElementById('suporte-list');
+    el.innerHTML = '<div class="p-10 text-center text-slate-600 text-sm">Carregando...</div>';
+    try {
+      const res = await api('suporte.php?action=listar');
+      allTickets = res.data.tickets || [];
+      renderTickets(allTickets);
+    } catch { el.innerHTML = '<p class="p-8 text-red-400 text-sm text-center">Erro ao carregar tickets.</p>'; }
+  }
+
+  function renderTickets(list) {
+    const el = document.getElementById('suporte-list');
+    if (!list.length) { el.innerHTML = '<p class="p-10 text-center text-slate-600">Nenhum ticket encontrado.</p>'; return; }
+    el.innerHTML = `
+      <table class="tbl">
+        <thead><tr>
+          <th>Empresa</th><th>Assunto</th><th>Mensagem</th><th>Aberto em</th><th>Status</th><th class="text-right">Ações</th>
+        </tr></thead>
+        <tbody>
+          ${list.map(t => `
+            <tr>
+              <td>
+                <p class="font-semibold text-slate-200 text-sm">${escHtml(t.razao_social||'—')}</p>
+                <code class="text-[10px] text-slate-600">${escHtml(t.slug||'')}</code>
+              </td>
+              <td class="text-slate-300 text-sm max-w-[160px]"><div class="truncate">${escHtml(t.assunto)}</div></td>
+              <td class="text-slate-500 text-xs max-w-[200px]"><div class="truncate">${escHtml(t.mensagem.substring(0,80))}</div></td>
+              <td class="text-slate-500 text-xs">${fmtDate(t.created_at)}</td>
+              <td><span class="sbadge s-${t.status}">${statusTicket(t.status)}</span></td>
+              <td class="text-right">
+                <div class="flex gap-1 justify-end flex-wrap">
+                  ${t.status !== 'fechado' ? `
+                    <button onclick="abrirResponder(${t.id},'${escAttr(t.assunto)}','${escAttr(t.mensagem)}')" class="btn btn-blue btn-sm">💬 Responder</button>
+                    <button onclick="fecharTicketSA(${t.id})" class="btn btn-ghost btn-sm">✓ Fechar</button>
+                  ` : '<span class="text-xs text-slate-600">Encerrado</span>'}
+                </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  function statusTicket(s) {
+    const m = { aguardando_sa:'⏳ Aguardando SA', aguardando_cliente:'💬 Respondido', aberto:'Aberto', fechado:'✓ Fechado' };
+    return m[s] || s;
+  }
+
+  function filtrarTickets(filtro) {
+    ticketFiltro = filtro;
+    ['todos','aguardando','respondido','fechado'].forEach(f => {
+      document.getElementById(`stf-${f}`)?.classList.replace('btn-blue','btn-ghost');
+    });
+    const map = { todos:'todos', aguardando_sa:'aguardando', aguardando_cliente:'respondido', fechado:'fechado' };
+    document.getElementById(`stf-${map[filtro]||filtro}`)?.classList.replace('btn-ghost','btn-blue');
+    if (filtro === 'todos') renderTickets(allTickets);
+    else renderTickets(allTickets.filter(t => t.status === filtro));
+  }
+
+  function abrirResponder(id, assunto, mensagem) {
+    document.getElementById('modal-extra').innerHTML = `
+      <div class="space-y-3">
+        <div class="p-3 bg-[#030712] rounded-xl">
+          <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1">Mensagem do cliente</p>
+          <p class="text-xs text-slate-300">${escHtml(mensagem)}</p>
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1">Sua Resposta *</label>
+          <textarea id="sa-resposta" class="inp" rows="4" placeholder="Digite sua resposta ao cliente..."></textarea>
+        </div>
+      </div>`;
+    openModal(`Responder: ${assunto.substring(0,40)}`, '', 'btn-blue', '💬 Enviar Resposta', async () => {
+      const resposta = document.getElementById('sa-resposta')?.value.trim();
+      if (!resposta) { showToast('Digite uma resposta.', 'red'); return; }
+      const res = await api('suporte.php?action=responder', 'POST', { ticket_id: id, resposta });
+      if (res.ok) { showToast('✅ Resposta enviada!', 'green'); loadSuporte(); }
+      else showToast(res.data.error || 'Erro.', 'red');
+    });
+  }
+
+  async function fecharTicketSA(id) {
+    const res = await api('suporte.php?action=fechar', 'POST', { ticket_id: id });
+    if (res.ok) { showToast('Ticket fechado.', 'green'); loadSuporte(); }
+    else showToast(res.data.error || 'Erro.', 'red');
+  }
+
+  // ============================================================
+  // EMAILS
+  // ============================================================
+  let _allTemplates = [];
+
+  function switchEmailTab(tab) {
+    ['log','compor','templates'].forEach(t => {
+      document.getElementById(`email-tab-${t}`)?.classList.replace(t===tab?'btn-ghost':'btn-blue', t===tab?'btn-blue':'btn-ghost');
+      const p = document.getElementById(`email-panel-${t}`);
+      if (p) p.classList.toggle('hidden', t !== tab);
+    });
+    if (tab === 'log')       loadEmailLog();
+    if (tab === 'compor')    { popularDestinatarios(); popularTemplateSelector(); }
+    if (tab === 'templates') loadEmailTemplates();
+  }
+
+  async function loadEmailTemplates() {
+    const el = document.getElementById('templates-list');
+    if (!el) return;
+    el.innerHTML = '<div class="p-10 text-center text-slate-600 text-sm">Carregando...</div>';
+    try {
+      const res = await api('superadmin.php?action=listar_email_templates');
+      _allTemplates = res.data.templates || [];
+      if (!_allTemplates.length) {
+        el.innerHTML = '<p class="p-10 text-center text-slate-600">Nenhum template cadastrado.</p>'; return;
+      }
+      el.innerHTML = `
+        <table class="tbl">
+          <thead><tr><th>Nome</th><th>Assunto</th><th class="text-right">Ações</th></tr></thead>
+          <tbody>
+            ${_allTemplates.map(t => `
+              <tr>
+                <td class="font-semibold text-slate-200">${escHtml(t.nome)}</td>
+                <td class="text-slate-400 text-xs max-w-[240px]"><div class="truncate">${escHtml(t.assunto)}</div></td>
+                <td class="text-right">
+                  <div class="flex gap-1 justify-end flex-wrap">
+                    <button onclick="enviarEmMassa(${t.id},'${escAttr(t.nome)}')" class="btn btn-ghost btn-sm" style="color:#a78bfa;border-color:rgba(167,139,250,.2)">📤 Em Massa</button>
+                    <button onclick="abrirModalTemplate(${t.id},'${escAttr(t.nome)}','${escAttr(t.assunto)}','${escAttr(t.corpo)}')" class="btn btn-ghost btn-sm">✏️ Editar</button>
+                    <button onclick="excluirTemplate(${t.id},'${escAttr(t.nome)}')" class="btn btn-ghost btn-sm text-red-400">🗑</button>
+                  </div>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`;
+    } catch { el.innerHTML = '<p class="p-8 text-red-400 text-sm text-center">Erro ao carregar templates.</p>'; }
+  }
+
+  function abrirModalTemplate(id = 0, nome = '', assunto = '', corpo = '') {
+    document.getElementById('modal-extra').innerHTML = `
+      <div class="space-y-3">
+        <div>
+          <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1">Nome do Template</label>
+          <input type="text" id="tpl-nome" class="inp" value="${escHtml(nome)}" placeholder="Ex: Boas-vindas">
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1">Assunto</label>
+          <input type="text" id="tpl-assunto" class="inp" value="${escHtml(assunto)}" placeholder="Assunto do e-mail">
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1">Corpo (texto ou HTML)</label>
+          <textarea id="tpl-corpo" class="inp" rows="5" placeholder="Conteúdo do e-mail...">${escHtml(corpo)}</textarea>
+        </div>
+      </div>`;
+    openModal(id ? 'Editar Template' : 'Novo Template', '', 'btn-blue', '💾 Salvar', async () => {
+      const payload = {
+        nome:    document.getElementById('tpl-nome').value.trim(),
+        assunto: document.getElementById('tpl-assunto').value.trim(),
+        corpo:   document.getElementById('tpl-corpo').value.trim(),
+      };
+      if (id) payload.id = id;
+      const res = await api('superadmin.php?action=salvar_email_template', 'POST', payload);
+      if (res.ok) { showToast('✅ Template salvo!', 'green'); loadEmailTemplates(); }
+      else showToast(res.data.error || 'Erro.', 'red');
+    });
+  }
+
+  function excluirTemplate(id, nome) {
+    openModal('Excluir Template', `Excluir o template <strong style="color:#f1f5f9">${escHtml(nome)}</strong>? Esta ação não pode ser desfeita.`,
+      'btn-red', '🗑 Excluir', async () => {
+        const res = await api('superadmin.php?action=excluir_email_template', 'POST', { id });
+        if (res.ok) { showToast('Template excluído.', 'red'); loadEmailTemplates(); }
+        else showToast(res.data.error || 'Erro.', 'red');
+      });
+  }
+
+  async function enviarEmMassa(templateId, nomeTemplate) {
+    // First fetch recipient count
+    let count = '?';
+    try {
+      const r = await api('superadmin.php?action=preview_email_massa');
+      if (r.ok) count = r.data.count ?? '?';
+    } catch {}
+
+    const body = `
+      <p class="text-slate-400 text-sm mb-4">
+        Enviar o template <strong class="text-slate-200">${escHtml(nomeTemplate)}</strong>
+        para <strong class="text-green-400">${count} cliente(s) ativo(s)</strong> com e-mail cadastrado.
+      </p>
+      <div class="rounded-xl p-3 mb-2" style="background:rgba(234,179,8,.07);border:1px solid rgba(234,179,8,.2)">
+        <p class="text-[11px] text-yellow-400 font-semibold mb-1">💡 Variáveis disponíveis no corpo</p>
+        <code class="text-[10px] text-yellow-300">&#123;&#123;nome&#125;&#125; · &#123;&#123;razao&#125;&#125; · &#123;&#123;slug&#125;&#125; · &#123;&#123;plano&#125;&#125;</code>
+      </div>
+      <p class="text-[11px] text-slate-600 mt-3">Cada cliente receberá seu e-mail personalizado. O envio pode levar alguns segundos.</p>`;
+
+    openModal('📤 Envio em Massa', body, 'btn-blue', '📤 Enviar Agora', async () => {
+      const res = await api('superadmin.php?action=enviar_email_massa', 'POST', { template_id: templateId });
+      if (res.ok) {
+        const d = res.data;
+        showToast(`✅ ${d.enviados} enviado(s)${d.falhos ? `, ${d.falhos} falho(s)` : ''} de ${d.total} clientes.`, 'green', 6000);
+      } else {
+        showToast(res.data.error || 'Erro ao enviar.', 'red');
+      }
+    });
+  }
+
+  // ---- Mimo modal ----
+  async function abrirMimo() {
+    // Pre-fetch counts for both targets
+    let countOnline = '…', countTodos = '…';
+    try {
+      const [ro, rt] = await Promise.all([
+        api('superadmin.php?action=preview_mimo&alvo=online'),
+        api('superadmin.php?action=preview_mimo&alvo=todos'),
+      ]);
+      if (ro.ok) countOnline = ro.data.count ?? '?';
+      if (rt.ok) countTodos  = rt.data.count ?? '?';
+    } catch {}
+
+    const moId = 'mimo-modal-overlay';
+    document.getElementById(moId)?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = moId;
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.7);backdrop-filter:blur(4px)';
+    overlay.innerHTML = `
+      <div class="card" style="width:100%;max-width:480px;padding:28px;position:relative;z-index:9999">
+        <div class="flex items-start gap-3 mb-6">
+          <div style="width:44px;height:44px;border-radius:12px;background:rgba(134,239,172,.1);border:1px solid rgba(134,239,172,.2);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">🎁</div>
+          <div>
+            <h3 class="font-bold text-slate-100 text-base">Dar Mimo aos Clientes</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Adiciona dias extras ao plano dos clientes selecionados</p>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Alvo</label>
+            <div class="grid grid-cols-2 gap-2">
+              <label id="mimo-alvo-online" class="flex items-start gap-3 rounded-xl p-3 cursor-pointer" style="background:rgba(52,211,153,.12);border:2px solid rgba(52,211,153,.4)">
+                <input type="radio" name="mimo-alvo" value="online" checked class="mt-0.5 accent-green-400">
+                <div>
+                  <p class="text-xs font-bold text-green-300">🟢 Online Agora</p>
+                  <p class="text-[10px] text-slate-500 mt-0.5">Somente os <strong id="mimo-count-online" class="text-green-400">${countOnline}</strong> usuários ativos nos últimos 10 min</p>
+                </div>
+              </label>
+              <label id="mimo-alvo-todos" class="flex items-start gap-3 rounded-xl p-3 cursor-pointer" style="background:rgba(255,255,255,.03);border:2px solid rgba(255,255,255,.08)">
+                <input type="radio" name="mimo-alvo" value="todos" class="mt-0.5 accent-blue-400">
+                <div>
+                  <p class="text-xs font-bold text-slate-300">👥 Todos Ativos</p>
+                  <p class="text-[10px] text-slate-500 mt-0.5">Todos os <strong id="mimo-count-todos" class="text-blue-400">${countTodos}</strong> clientes com status ativo</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Dias a Adicionar</label>
+            <div class="flex gap-2 items-center">
+              <input type="number" id="mimo-dias" min="1" max="365" value="7" class="inp text-center text-lg font-black w-28" style="color:#86efac">
+              <div class="flex gap-1">
+                <button type="button" onclick="document.getElementById('mimo-dias').stepDown()" class="btn btn-ghost btn-sm px-3">−</button>
+                <button type="button" onclick="document.getElementById('mimo-dias').stepUp()" class="btn btn-ghost btn-sm px-3">+</button>
+                ${[7,15,30].map(d => `<button type="button" onclick="document.getElementById('mimo-dias').value=${d}" class="btn btn-ghost btn-sm text-[10px]">${d}d</button>`).join('')}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Mensagem (opcional)</label>
+            <textarea id="mimo-mensagem" rows="2" class="inp resize-none text-sm" placeholder="Ex: Obrigado por estar conosco! Aqui está um presente especial 🎁"></textarea>
+          </div>
+
+          <label class="flex items-center gap-2.5 cursor-pointer">
+            <input type="checkbox" id="mimo-notificar" checked class="w-4 h-4 accent-green-400 rounded">
+            <span class="text-xs text-slate-400">Notificar clientes por e-mail</span>
+          </label>
+        </div>
+
+        <div id="mimo-result" class="hidden mt-4 p-3 rounded-xl text-sm font-semibold text-center"></div>
+
+        <div class="flex gap-3 mt-6">
+          <button onclick="document.getElementById('${moId}').remove()" class="btn btn-ghost flex-1">Cancelar</button>
+          <button id="btn-mimo-enviar" onclick="confirmarMimo('${moId}')" class="btn btn-green flex-1 font-bold">🎁 Dar Mimo</button>
+        </div>
+      </div>`;
+
+    // Style the radio labels on change
+    overlay.querySelectorAll('input[name="mimo-alvo"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        overlay.querySelectorAll('label[id^="mimo-alvo-"]').forEach(l => {
+          l.style.background = 'rgba(255,255,255,.03)';
+          l.style.borderColor = 'rgba(255,255,255,.08)';
+        });
+        const chosen = overlay.querySelector(`#mimo-alvo-${radio.value}`);
+        if (chosen) {
+          chosen.style.background = radio.value === 'online' ? 'rgba(52,211,153,.12)' : 'rgba(59,130,246,.12)';
+          chosen.style.borderColor = radio.value === 'online' ? 'rgba(52,211,153,.4)' : 'rgba(59,130,246,.4)';
+        }
+      });
+    });
+
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+  }
+
+  async function confirmarMimo(overlayId) {
+    const alvo      = document.querySelector('input[name="mimo-alvo"]:checked')?.value || 'online';
+    const dias      = parseInt(document.getElementById('mimo-dias')?.value || '0');
+    const mensagem  = document.getElementById('mimo-mensagem')?.value?.trim() || '';
+    const notificar = document.getElementById('mimo-notificar')?.checked ?? true;
+    const resultEl  = document.getElementById('mimo-result');
+    const btn       = document.getElementById('btn-mimo-enviar');
+
+    if (!dias || dias < 1) { showToast('Informe quantos dias deseja dar.', 'red'); return; }
+
+    btn.disabled = true; btn.textContent = 'Enviando…';
+
+    const res = await api('superadmin.php?action=dar_mimo', 'POST', { dias, alvo, mensagem, notificar: notificar ? 1 : 0 });
+
+    btn.disabled = false; btn.textContent = '🎁 Dar Mimo';
+
+    if (res.ok) {
+      const d = res.data;
+      const txt = d.presenteados > 0
+        ? `🎉 ${d.presenteados} cliente(s) receberam +${dias} dia(s)!`
+        : (d.message || 'Nenhum cliente online no momento.');
+      resultEl.textContent = txt;
+      resultEl.className = d.presenteados > 0
+        ? 'block mt-4 p-3 rounded-xl text-sm font-semibold text-center bg-green-900/30 border border-green-500/30 text-green-400'
+        : 'block mt-4 p-3 rounded-xl text-sm font-semibold text-center bg-yellow-900/30 border border-yellow-500/30 text-yellow-400';
+      if (d.presenteados > 0) showToast(`🎁 Mimo dado para ${d.presenteados} cliente(s)!`, 'green', 5000);
+      setTimeout(() => { document.getElementById(overlayId)?.remove(); loadDashboard(); }, d.presenteados > 0 ? 2500 : 4000);
+    } else {
+      showToast(res.data.error || 'Erro ao dar mimo.', 'red');
+    }
+  }
+
+  async function popularTemplateSelector() {
+    const sel = document.getElementById('email-template-sel');
+    if (!sel) return;
+    if (!_allTemplates.length) {
+      const res = await api('superadmin.php?action=listar_email_templates');
+      _allTemplates = res.data.templates || [];
+    }
+    while (sel.options.length > 1) sel.remove(1);
+    _allTemplates.forEach(t => sel.add(new Option(t.nome, t.id)));
+  }
+
+  function carregarTemplateNoCompor() {
+    const sel = document.getElementById('email-template-sel');
+    const id  = parseInt(sel?.value || '0');
+    if (!id) return;
+    const tpl = _allTemplates.find(t => t.id === id);
+    if (!tpl) return;
+    const assEl = document.getElementById('email-assunto');
+    const corEl = document.getElementById('email-corpo');
+    if (assEl) assEl.value = tpl.assunto;
+    if (corEl) corEl.value = tpl.corpo;
+  }
+
+  async function loadEmailLog() {
+    const el = document.getElementById('email-log-list');
+    el.innerHTML = '<div class="p-10 text-center text-slate-600 text-sm">Carregando...</div>';
+    try {
+      const res = await api('superadmin.php?action=email_log');
+      const logs = res.data.logs || [];
+      if (!logs.length) { el.innerHTML = '<p class="p-10 text-center text-slate-600">Nenhum e-mail registrado.</p>'; return; }
+      el.innerHTML = `
+        <table class="tbl">
+          <thead><tr><th>Destinatário</th><th>Assunto</th><th>Enviado</th><th>Status</th><th class="text-right">Ação</th></tr></thead>
+          <tbody>
+            ${logs.map(l => `
+              <tr>
+                <td><p class="text-slate-300">${escHtml(l.para_email)}</p><p class="text-[11px] text-slate-600">${escHtml(l.para_nome||'')}</p></td>
+                <td class="text-slate-400 text-xs max-w-[220px]"><div class="truncate">${escHtml(l.assunto)}</div></td>
+                <td class="text-slate-500 text-xs">${fmtDate(l.enviado_em)}</td>
+                <td><span class="sbadge ${l.status==='enviado'?'s-confirmado':'s-rejeitado'}">${l.status==='enviado'?'✓ Enviado':'✗ Falhou'}</span></td>
+                <td class="text-right">
+                  <button onclick="excluirEmailLog(${l.id})" class="btn btn-ghost btn-sm text-red-400" title="Excluir">🗑</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`;
+    } catch { el.innerHTML = '<p class="p-8 text-red-400 text-sm text-center">Erro ao carregar log.</p>'; }
+  }
+
+  async function excluirEmailLog(id) {
+    const res = await api('superadmin.php?action=excluir_email_log', 'POST', { id });
+    if (res.ok) { showToast('Registro removido.', 'green'); loadEmailLog(); }
+    else showToast(res.data.error || 'Erro.', 'red');
+  }
+
+  async function popularDestinatarios() {
+    const sel = document.getElementById('email-dest-cliente');
+    if (!sel) return;
+    if (sel.options.length > 1) return;
+    if (!allClientes.length) {
+      const res = await api('superadmin.php?action=clientes');
+      allClientes = res.data.clientes || [];
+    }
+    allClientes.forEach(c => {
+      const opt = new Option(`${c.razao_social} (${c.email||c.slug})`, c.email||'');
+      sel.add(opt);
+    });
+  }
+
+  function preencherEmailDest() {
+    const val = document.getElementById('email-dest-cliente').value;
+    if (val) document.getElementById('email-dest').value = val;
+  }
+
+  async function enviarEmailManual() {
+    const para    = document.getElementById('email-dest').value.trim();
+    const assunto = document.getElementById('email-assunto').value.trim();
+    const corpo   = document.getElementById('email-corpo').value.trim();
+    const btn     = document.getElementById('btn-enviar-email');
+    const status  = document.getElementById('email-compor-status');
+    if (!para || !assunto || !corpo) { showToast('Preencha destinatário, assunto e mensagem.', 'red'); return; }
+    btn.disabled = true; btn.textContent = 'Enviando...';
+    try {
+      const res = await api('superadmin.php?action=enviar_email_manual', 'POST', { para, assunto, corpo });
+      if (res.ok) {
+        showToast('✅ E-mail enviado!', 'green');
+        status.textContent = '✅ E-mail enviado com sucesso!';
+        status.className = 'block p-3 rounded-xl text-sm font-semibold text-center bg-green-900/30 border border-green-500/30 text-green-400';
+        document.getElementById('email-assunto').value = '';
+        document.getElementById('email-corpo').value   = '';
+      } else {
+        showToast(res.data.error || 'Erro ao enviar.', 'red');
+        status.textContent = '⚠ ' + (res.data.error || 'Erro ao enviar.');
+        status.className = 'block p-3 rounded-xl text-sm font-semibold text-center bg-red-900/30 border border-red-500/30 text-red-400';
+      }
+    } catch { showToast('Erro de conexão.', 'red'); }
+    finally {
+      btn.disabled = false; btn.textContent = 'Enviar E-mail';
+      setTimeout(() => { status.className = 'hidden'; }, 6000);
+    }
+  }
+
+  // ============================================================
+  // AÇÕES
+  // ============================================================
+  function abrirConfirmar(id, razao, plano, valor, email, nome) {
+    document.getElementById('modal-extra').innerHTML = `
+      <div class="email-preview mb-2">
+        <strong>📧 E-mail que será enviado para ${escHtml(email)}:</strong><br><br>
+        Olá, <strong>${escHtml(nome)}</strong>! Sua conta <strong>${escHtml(razao)}</strong> foi ativada no plano <strong>${plano}</strong>.<br><br>
+        <strong>Sua senha inicial de acesso será o seu próprio e-mail.</strong>
+      </div>`;
+    openModal('Confirmar Pagamento',
+      `Ativar <strong style="color:#f1f5f9">${escHtml(razao)}</strong> no plano <strong style="color:#60a5fa">${plano}</strong> · R$ ${fmtMoney(valor)}`,
+      'btn-green', '✓ Confirmar e Ativar',
+      async () => {
+        const res = await api('superadmin.php?action=confirmar', 'POST', { pedido_id: id });
+        if (res.ok) {
+          showToast(`✅ ${razao} ativado! ${res.data.email_enviado ? '📧 E-mail enviado.' : '⚠️ E-mail não enviado (configure SMTP).'}`, 'green', 6000);
+          refreshAll(); loadPedidos();
+        } else showToast(res.data.error || 'Erro ao ativar.', 'red');
+      });
+  }
+
+  function abrirRejeitar(id, razao) {
+    document.getElementById('modal-extra').innerHTML = `
+      <div class="mb-1">
+        <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Motivo (opcional)</label>
+        <input type="text" id="rejeitar-obs" class="inp" placeholder="Ex: pagamento não identificado">
+      </div>`;
+    openModal('Rejeitar Pedido', `Rejeitar o pedido de <strong style="color:#f1f5f9">${escHtml(razao)}</strong>?`,
+      'btn-red', '✕ Rejeitar',
+      async () => {
+        const obs = document.getElementById('rejeitar-obs')?.value || '';
+        const res = await api('superadmin.php?action=rejeitar', 'POST', { pedido_id: id, observacoes: obs });
+        if (res.ok) { showToast('Pedido rejeitado.', 'red'); loadPedidos(); }
+        else showToast(res.data.error || 'Erro.', 'red');
+      });
+  }
+
+  function suspenderTenant(slug, razao) {
+    openModal('Suspender Empresa', `Suspender <strong style="color:#f1f5f9">${escHtml(razao)}</strong>? O cliente não conseguirá mais fazer login.`,
+      'btn-red', 'Suspender',
+      async () => {
+        const res = await api('superadmin.php?action=suspender', 'POST', { tenant_slug: slug });
+        if (res.ok) { showToast(`${razao} suspenso.`, 'red'); loadClientes(); }
+      });
+  }
+
+  function reativarTenant(slug, razao) {
+    openModal('Reativar Empresa', `Reativar <strong style="color:#f1f5f9">${escHtml(razao)}</strong>?`,
+      'btn-green', 'Reativar',
+      async () => {
+        const res = await api('superadmin.php?action=reativar', 'POST', { tenant_slug: slug });
+        if (res.ok) { showToast(`${razao} reativado! ✓`, 'green'); loadClientes(); }
+      });
+  }
+
+  async function alterarSenha() {
+    const atual = document.getElementById('cfg-senha-atual').value;
+    const nova  = document.getElementById('cfg-senha-nova').value;
+    const res   = await api('superadmin.php?action=alterar_senha', 'POST', { senha_atual: atual, senha_nova: nova });
+    showToast(res.ok ? 'Senha alterada com sucesso!' : (res.data.error || 'Erro.'), res.ok ? 'green' : 'red');
+  }
+
+  // ============================================================
+  // CONFIG TABS
+  // ============================================================
+  function switchCfgTab(tab) {
+    const tabs = ['geral','pix','cron','indicacoes','app','db'];
+    const panels = { geral:'cfg-panel-geral', pix:'cfg-panel-pix', cron:'cfg-panel-cron', indicacoes:'cfg-panel-indicacoes', app:'cfg-panel-app', db:'cfg-panel-db' };
+    tabs.forEach(t => {
+      const btn = document.getElementById(`cfg-tab-${t}`);
+      if (btn) { btn.className = t===tab ? 'btn btn-blue btn-sm' : 'btn btn-ghost btn-sm'; }
+      const panel = document.getElementById(panels[t]);
+      if (panel) panel.style.display = t===tab ? 'block' : 'none';
+    });
+    if (tab === 'pix')        loadConfigPix();
+    if (tab === 'cron')       loadCronInfo();
+    if (tab === 'indicacoes') { loadConfigIndicacao(); loadIndicacoes(); }
+    if (tab === 'app')        loadConfigApp();
+    if (tab === 'db')         { loadDbStats(); loadDriverAtual(); }
+  }
+
+  async function loadDriverAtual() {
+    try {
+      const res = await api('superadmin.php?action=db_stats');
+      if (!res.ok) return;
+      const driver = (res.data.driver || 'sqlite').toLowerCase();
+      const sel = document.getElementById('db-driver-sel');
+      if (sel) sel.value = driver;
+    } catch {}
+  }
+
+  async function salvarDriver() {
+    const sel    = document.getElementById('db-driver-sel');
+    const status = document.getElementById('db-driver-status');
+    const btn    = document.getElementById('btn-salvar-driver');
+    const driver = sel?.value;
+    if (!driver) return;
+    btn.disabled = true; btn.textContent = 'Salvando...';
+    try {
+      const res = await api('superadmin.php?action=trocar_driver', 'POST', { driver });
+      if (res.ok) {
+        status.textContent = '✅ Driver salvo! Reinicie o servidor para aplicar a mudança.';
+        status.className = 'block p-3 rounded-xl text-sm font-semibold text-center bg-green-900/30 border border-green-500/30 text-green-400';
+        showToast('✅ Driver atualizado!', 'green');
+      } else {
+        status.textContent = '⚠ ' + (res.data.error || 'Erro ao salvar driver.');
+        status.className = 'block p-3 rounded-xl text-sm font-semibold text-center bg-red-900/30 border border-red-500/30 text-red-400';
+        showToast(res.data.error || 'Erro.', 'red');
+      }
+    } catch {
+      showToast('Erro de conexão.', 'red');
+    } finally {
+      btn.disabled = false; btn.textContent = '💾 Salvar Driver';
+      setTimeout(() => { status.className = 'hidden'; }, 7000);
+    }
+  }
+
+  async function loadCronInfo() {
+    try {
+      const res = await api('superadmin.php?action=get_cron_token');
+      const token = (res.ok && res.data.token) ? res.data.token : 'erro';
+      const el = document.getElementById('cron-token-display');
+      if (el) el.textContent = token;
+    } catch {}
+  }
+
+  async function testarCron() {
+    const btn = document.getElementById('btn-testar-cron');
+    const box = document.getElementById('cron-result');
+    btn.disabled = true; btn.textContent = 'Executando...';
+    box.className = 'block bg-[#030712] rounded-xl p-4 text-xs font-mono text-slate-300 mb-4 max-h-48 overflow-y-auto whitespace-pre-wrap';
+    box.textContent = 'Aguarde...';
+    try {
+      const tokenEl = document.getElementById('cron-token-display');
+      const token   = tokenEl ? tokenEl.textContent.trim() : '';
+      const resp    = await fetch(`api/cron_vencimento.php?token=${token}`);
+      const json    = await resp.json();
+      box.textContent = JSON.stringify(json, null, 2);
+    } catch (e) { box.textContent = '❌ Erro: ' + e.message; box.classList.add('text-red-400'); }
+    finally { btn.disabled = false; btn.textContent = '▶ Executar Cron Agora (Teste)'; }
+  }
+
+  async function loadConfigPix() {
+    try {
+      const res = await api('superadmin.php?action=get_config_pix');
+      if (!res.ok) return;
+      const c = res.data.config || {};
+      const f = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+      f('cfg-pix-chave', c.pix_chave); f('cfg-pix-nome', c.pix_nome); f('cfg-pix-cidade', c.pix_cidade);
+      f('cfg-pix-email-notif', c.email_notificacao); f('cfg-pix-email-rem', c.email_remetente);
+    } catch {}
+  }
+
+  async function salvarConfigPix() {
+    const btn = document.getElementById('btn-salvar-pix'); btn.disabled = true; btn.textContent = 'Salvando...';
+    const payload = { pix_chave: document.getElementById('cfg-pix-chave').value.trim(), pix_nome: document.getElementById('cfg-pix-nome').value.trim(), pix_cidade: document.getElementById('cfg-pix-cidade').value.trim(), email_notificacao: document.getElementById('cfg-pix-email-notif').value.trim(), email_remetente: document.getElementById('cfg-pix-email-rem').value.trim() };
+    const res = await api('superadmin.php?action=salvar_config_pix', 'POST', payload);
+    showToast(res.ok ? '✅ PIX salvo!' : (res.data.error || 'Erro.'), res.ok ? 'green' : 'red');
+    btn.disabled = false; btn.textContent = 'Salvar Configurações PIX';
+  }
+
+  async function loadConfigIndicacao() {
+    try {
+      const res = await api('superadmin.php?action=get_config_indicacao');
+      if (!res.ok) return;
+      const c = res.data.config || {};
+      const chk = document.getElementById('cfg-ind-ativo');
+      const txt = document.getElementById('cfg-ind-recompensa');
+      const val = document.getElementById('cfg-ind-valor');
+      if (chk) chk.checked = (c.indicacao_ativo === '1');
+      if (txt) txt.value   = c.indicacao_recompensa_desc || '';
+      if (val) val.value   = c.indicacao_valor_recompensa || '';
+    } catch {}
+  }
+
+  async function salvarConfigIndicacao() {
+    const btn    = document.getElementById('btn-salvar-ind'); btn.disabled = true; btn.textContent = 'Salvando...';
+    const payload = {
+      indicacao_ativo:            document.getElementById('cfg-ind-ativo').checked ? '1' : '0',
+      indicacao_recompensa_desc:  document.getElementById('cfg-ind-recompensa').value.trim(),
+      indicacao_valor_recompensa: document.getElementById('cfg-ind-valor').value.trim(),
+    };
+    const res = await api('superadmin.php?action=salvar_config_indicacao', 'POST', payload);
+    showToast(res.ok ? '✅ Salvo!' : (res.data.error || 'Erro.'), res.ok ? 'green' : 'red');
+    btn.disabled = false; btn.textContent = 'Salvar Configurações de Indicações';
+  }
+
+  async function loadIndicacoes() {
+    const el = document.getElementById('indicacoes-list');
+    el.innerHTML = '<div class="p-8 text-center text-slate-600 text-sm">Carregando...</div>';
+    try {
+      const res  = await api('superadmin.php?action=listar_indicacoes');
+      const list = res.data.indicacoes || [];
+      if (!list.length) { el.innerHTML = '<p class="p-10 text-center text-slate-600">Nenhuma indicação registrada.</p>'; return; }
+      const statusMap = { pendente:'⏳ Pendente', validado:'✅ Validado', rejeitado:'❌ Rejeitado' };
+      const colorMap  = { pendente:'s-pendente', validado:'s-confirmado', rejeitado:'s-rejeitado' };
+      el.innerHTML = `
+        <table class="tbl">
+          <thead><tr><th>Indicador</th><th>Indicado</th><th>Pedido</th><th>Status</th><th class="text-right">Ações</th></tr></thead>
+          <tbody>
+            ${list.map(i => `
+              <tr>
+                <td><p class="font-semibold text-slate-200">${escHtml(i.indicador_razao||i.indicador_slug)}</p><code class="text-[10px] text-slate-600">${escHtml(i.indicador_slug)}</code></td>
+                <td><p class="text-slate-300">${escHtml(i.indicado_razao||'—')}</p><p class="text-[11px] text-slate-500">${escHtml(i.indicado_email)}</p></td>
+                <td class="text-xs text-slate-500 font-mono">${escHtml(i.pedido_ref||'—')}</td>
+                <td><span class="sbadge ${colorMap[i.status]||'s-pendente'}">${statusMap[i.status]||i.status}</span></td>
+                <td class="text-right">
+                  <div class="flex gap-1 justify-end flex-wrap">
+                    <button onclick="ajustarIndicacao(${i.id},'${escAttr(i.indicado_razao||i.indicado_email)}','${i.status}')" class="btn btn-amber btn-sm">🎯 Ajustar</button>
+                    ${i.status==='pendente' ? `
+                      <button onclick="validarIndicacao(${i.id},'${escAttr(i.indicado_razao||i.indicado_email)}')" class="btn btn-green btn-sm">✓ Validar</button>
+                      <button onclick="rejeitarIndicacao(${i.id},'${escAttr(i.indicado_razao||i.indicado_email)}')" class="btn btn-red btn-sm">✕ Rejeitar</button>
+                    ` : `<span class="text-xs text-slate-600">${fmtDate(i.validated_at||i.created_at,true)}</span>`}
+                  </div>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`;
+    } catch { el.innerHTML = '<p class="p-8 text-red-400 text-sm text-center">Erro ao carregar.</p>'; }
+  }
+
+  function validarIndicacao(id, nome) {
+    document.getElementById('modal-extra').innerHTML = `<div><label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Observação (opcional)</label><input type="text" id="val-obs" class="inp" placeholder="Ex: Pagamento confirmado"></div>`;
+    openModal('Validar Indicação', `Confirmar indicação de <strong style="color:#f1f5f9">${escHtml(nome)}</strong>?`, 'btn-green', '✓ Validar', async () => {
+      const obs = document.getElementById('val-obs')?.value || '';
+      const res = await api('superadmin.php?action=validar_indicacao', 'POST', { id, observacoes: obs });
+      if (res.ok) { showToast('✅ Indicação validada!', 'green'); loadIndicacoes(); }
+      else showToast(res.data.error || 'Erro.', 'red');
+    });
+  }
+
+  function rejeitarIndicacao(id, nome) {
+    document.getElementById('modal-extra').innerHTML = `<div><label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Motivo (opcional)</label><input type="text" id="rej-obs" class="inp" placeholder="Ex: indicação duplicada"></div>`;
+    openModal('Rejeitar Indicação', `Rejeitar indicação de <strong style="color:#f1f5f9">${escHtml(nome)}</strong>?`, 'btn-red', '✕ Rejeitar', async () => {
+      const obs = document.getElementById('rej-obs')?.value || '';
+      const res = await api('superadmin.php?action=rejeitar_indicacao', 'POST', { id, observacoes: obs });
+      if (res.ok) { showToast('Indicação rejeitada.', 'red'); loadIndicacoes(); }
+      else showToast(res.data.error || 'Erro.', 'red');
+    });
+  }
+
+  function ajustarIndicacao(id, indicado, statusAtual) {
+    document.getElementById('modal-extra').innerHTML = `
+      <div class="space-y-3">
+        <div>
+          <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Status</label>
+          <select id="ajust-status" class="inp">
+            <option value="pendente"  ${statusAtual==='pendente'  ?'selected':''}>⏳ Pendente</option>
+            <option value="validado"  ${statusAtual==='validado'  ?'selected':''}>✅ Validado</option>
+            <option value="rejeitado" ${statusAtual==='rejeitado' ?'selected':''}>❌ Rejeitado</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Recompensa Ajustada (R$)</label>
+          <input type="number" id="ajust-valor" class="inp" step="0.01" min="0" placeholder="0.00">
+          <p class="text-[10px] text-slate-600 mt-1">Valor creditado ao indicador por esta indicação.</p>
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Observação Interna</label>
+          <input type="text" id="ajust-obs" class="inp" placeholder="Nota interna sobre este ajuste">
+        </div>
+      </div>`;
+    openModal('Ajustar Indicação', `Ajustar indicação de <strong style="color:#f1f5f9">${escHtml(indicado)}</strong>`, 'btn-amber', '🎯 Salvar Ajuste', async () => {
+      const payload = {
+        id,
+        status:        document.getElementById('ajust-status').value,
+        reward_ajuste: document.getElementById('ajust-valor').value,
+        observacoes:   document.getElementById('ajust-obs').value,
+      };
+      const res = await api('superadmin.php?action=ajustar_indicacao', 'POST', payload);
+      if (res.ok) { showToast('✅ Indicação ajustada!', 'green'); loadIndicacoes(); }
+      else showToast(res.data.error || 'Erro.', 'red');
+    });
+  }
+
+  async function loadConfigApp() {
+    try {
+      const res = await api('superadmin.php?action=get_config_app_aviso');
+      if (!res.ok) return;
+      const c = res.data.config || {};
+      const chk = document.getElementById('cfg-app-ativo');
+      if (chk) chk.checked = (c.app_aviso_ativo === '1');
+      const f = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+      f('cfg-app-titulo', c.app_aviso_titulo); f('cfg-app-mensagem', c.app_aviso_mensagem);
+      f('cfg-app-android', c.app_aviso_url_android); f('cfg-app-ios', c.app_aviso_url_ios);
+    } catch {}
+  }
+
+  async function salvarConfigApp() {
+    const btn = document.getElementById('btn-salvar-app'); btn.disabled = true; btn.textContent = 'Salvando...';
+    const payload = { app_aviso_ativo: document.getElementById('cfg-app-ativo').checked ? '1' : '0', app_aviso_titulo: document.getElementById('cfg-app-titulo').value.trim(), app_aviso_mensagem: document.getElementById('cfg-app-mensagem').value.trim(), app_aviso_url_android: document.getElementById('cfg-app-android').value.trim(), app_aviso_url_ios: document.getElementById('cfg-app-ios').value.trim() };
+    const res = await api('superadmin.php?action=salvar_config_app_aviso', 'POST', payload);
+    showToast(res.ok ? '✅ App salvo!' : (res.data.error || 'Erro.'), res.ok ? 'green' : 'red');
+    btn.disabled = false; btn.textContent = 'Salvar Configurações do App';
+  }
+
+  // ---- DB Stats ----
+  async function loadDbStats() {
+    const el = document.getElementById('db-stats-box');
+    el.innerHTML = '<div class="p-6 text-center text-slate-600 text-sm">Carregando...</div>';
+    try {
+      const res = await api('superadmin.php?action=db_stats');
+      if (!res.ok) { el.innerHTML = '<p class="text-red-400 text-sm text-center p-4">Erro ao carregar estatísticas.</p>'; return; }
+      const d = res.data;
+      el.innerHTML = `
+        <div class="grid grid-cols-2 gap-3">
+          ${Object.entries(d.tabelas||{}).map(([t,c]) => `
+            <div class="flex justify-between items-center p-3 bg-[#030712] rounded-xl">
+              <span class="text-xs text-slate-400 font-mono">${t}</span>
+              <span class="text-xs font-bold text-blue-400">${c} reg.</span>
+            </div>
+          `).join('')}
+        </div>
+        <div class="mt-4 p-3 bg-[#030712] rounded-xl text-xs text-slate-500">
+          <span class="font-bold text-slate-300">Driver:</span> ${d.driver || '—'}
+          ${d.size_mb ? ` · <span class="font-bold text-slate-300">Tamanho:</span> ${d.size_mb} MB` : ''}
+          ${d.versao ? ` · <span class="font-bold text-slate-300">Versão:</span> ${d.versao}` : ''}
+        </div>
+      `;
+    } catch { el.innerHTML = '<p class="text-red-400 text-sm text-center p-4">Erro de conexão.</p>'; }
+  }
+
+  async function downloadBackup() {
+    const btn = document.getElementById('btn-backup');
+    btn.disabled = true; btn.textContent = '⬇ Gerando backup...';
+    try {
+      const res = await fetch('./api/superadmin.php?action=backup_db', { credentials: 'same-origin' });
+      if (!res.ok) { showToast('Erro ao gerar backup.', 'red'); return; }
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = `pdvo_backup_${new Date().toISOString().split('T')[0]}.sql`; a.click();
+      URL.revokeObjectURL(url);
+      showToast('Backup exportado!', 'green');
+    } catch { showToast('Erro ao baixar backup.', 'red'); }
+    finally { btn.disabled = false; btn.textContent = '⬇ Exportar Backup (SQL)'; }
+  }
+
+  // ============================================================
+  // MODAL
+  // ============================================================
+  function openModal(title, desc, btnClass, btnText, cb) {
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-desc').innerHTML    = desc;
+    if (!document.getElementById('modal-extra').innerHTML) document.getElementById('modal-extra').innerHTML = '';
+    const btn = document.getElementById('modal-confirm-btn');
+    btn.className = `btn ${btnClass} flex-1`; btn.textContent = btnText;
+    _modalCb = cb;
+    document.getElementById('modal').classList.add('open');
+  }
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+    document.getElementById('modal-extra').innerHTML = '';
+  }
+  document.getElementById('modal-confirm-btn').onclick = async () => {
+    if (_modalCb) { closeModal(); await _modalCb(); }
+  };
+  document.getElementById('modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal')) closeModal();
+  });
+
+  // ============================================================
+  // UTILS
+  // ============================================================
+  async function api(endpoint, method = 'GET', body = null) {
+    const opts = { method, credentials: 'same-origin', headers: { Accept: 'application/json' } };
+    if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    try {
+      const res  = await fetch(`./api/${endpoint}`, opts);
+      const data = await res.json();
+      return { ok: res.ok, status: res.status, data };
+    } catch { return { ok: false, data: { error: 'Erro de conexão.' } }; }
+  }
+
+  function showToast(msg, type = 'blue', duration = 4500) {
+    const colors = { green:'#16a34a', blue:'#2563eb', red:'#dc2626', amber:'#d97706' };
+    const el = document.createElement('div');
+    el.style.cssText = `background:${colors[type]||colors.blue};color:#fff;padding:13px 20px;border-radius:14px;font-size:13px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.5);max-width:380px;pointer-events:auto;cursor:pointer;line-height:1.4;`;
+    el.textContent = msg; el.onclick = () => el.remove();
+    document.getElementById('toast-root').appendChild(el);
+    setTimeout(() => { el.style.transition = 'opacity .3s, transform .3s'; el.style.opacity = '0'; el.style.transform = 'translateX(10px)'; setTimeout(() => el.remove(), 350); }, duration);
+  }
+
+  function set(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+  function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function escAttr(s) { return String(s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+  function fmtDate(d, dateOnly = false) {
+    if (!d) return '—';
+    const dt = new Date(d.replace ? d.replace(' ','T') : d);
+    if (isNaN(dt)) return String(d);
+    return dateOnly ? dt.toLocaleDateString('pt-BR') : dt.toLocaleString('pt-BR');
+  }
+  function fmtMoney(v) { return parseFloat(v||0).toFixed(2).replace('.',','); }
+  function canConfirm(s) { return ['pendente','aguardando_confirmacao'].includes(s); }
+  function statusLabel(s) {
+    const m = { pendente:'⏳ Pendente', aguardando_confirmacao:'🔔 Aguardando', confirmado:'✅ Confirmado', rejeitado:'❌ Rejeitado', ativo:'✅ Ativo', suspenso:'⛔ Suspenso' };
+    return m[s] || s;
+  }
+
+  function refreshAll() { loadDashboard(); }
+</script>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
+  }
+</script>
+</body>
+</html>

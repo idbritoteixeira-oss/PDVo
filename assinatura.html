@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-tema="dark">
+<head>
+  <meta charset="UTF-8">
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PDVo">
+  <link rel="apple-touch-icon" href="./assets/icons/icon.php?size=180">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDVo — Assine Agora</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./assets/css/pdv.css">
+  <style>
+    body { background: #020617; color: #f1f5f9; min-height: 100vh; }
+    .glass { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); backdrop-filter: blur(12px); }
+    .plan-card { transition: transform .2s, box-shadow .2s; cursor: pointer; }
+    .plan-card:hover { transform: translateY(-4px); }
+    .plan-card.selected { border-color: #3b82f6 !important; box-shadow: 0 0 0 3px rgba(59,130,246,.35); }
+    .plan-card.destaque { border-color: rgba(59,130,246,.4); background: rgba(59,130,246,.07); }
+    .step-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; transition: all .3s; }
+    .step-dot.done { background: #22c55e; color: #fff; }
+    .step-dot.active { background: #3b82f6; color: #fff; box-shadow: 0 0 0 4px rgba(59,130,246,.3); }
+    .step-dot.idle { background: #1e293b; color: #64748b; border: 2px solid #334155; }
+    .step-line { height: 2px; flex: 1; background: #1e293b; }
+    .step-line.done { background: #22c55e; }
+    @keyframes pulse-ring { 0%{transform:scale(.8);opacity:1} 100%{transform:scale(2);opacity:0} }
+    .pulse-ring { animation: pulse-ring 1.5s ease-out infinite; }
+    @keyframes float-up { 0%{transform:translateY(20px);opacity:0} 100%{transform:translateY(0);opacity:1} }
+    .float-up { animation: float-up .5s ease forwards; }
+    input.inp { background: #0f172a; border: 1px solid #1e293b; color: #f1f5f9; border-radius: 10px; padding: 12px 14px; width: 100%; outline: none; font-size: 14px; transition: border-color .2s; }
+    input.inp:focus { border-color: #3b82f6; }
+    select.inp { background: #0f172a; border: 1px solid #1e293b; color: #f1f5f9; border-radius: 10px; padding: 12px 14px; width: 100%; outline: none; font-size: 14px; appearance: none; }
+    .badge-plan { font-size: 10px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; padding: 3px 10px; border-radius: 99px; }
+  </style>
+</head>
+<body>
+  <!-- Fundo animado -->
+  <div class="fixed inset-0 overflow-hidden pointer-events-none">
+    <div class="absolute top-[-20%] left-[-10%] w-96 h-96 rounded-full bg-blue-600/10 blur-3xl"></div>
+    <div class="absolute bottom-[-10%] right-[-5%] w-72 h-72 rounded-full bg-indigo-600/10 blur-3xl"></div>
+  </div>
+
+  <div class="relative min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl font-black text-blue-400 tracking-tight">PDVo</span>
+        <span class="text-xs text-slate-500 border border-slate-700 px-2 py-0.5 rounded">Assinatura</span>
+      </div>
+      <a href="dashboard.html" class="text-xs text-slate-400 hover:text-white transition-colors">← Voltar ao PDVo</a>
+    </header>
+
+    <main class="flex-1 max-w-3xl mx-auto w-full px-4 py-10">
+
+      <!-- Tab Nav: Assinar | Minhas Indicações -->
+      <div class="flex gap-2 mb-8">
+        <button id="tab-assinar" onclick="mostrarAba('assinar')"
+          class="flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest bg-blue-600 text-white transition-all">
+          📋 Assinar
+        </button>
+        <button id="tab-indicacoes" onclick="mostrarAba('indicacoes')"
+          class="flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-800 text-slate-400 border border-slate-700 hover:border-blue-500 hover:text-blue-400 transition-all">
+          🤝 Minhas Indicações
+        </button>
+      </div>
+
+      <!-- ===== ABA: ASSINAR ===== -->
+      <div id="aba-assinar">
+
+      <!-- Progress Steps -->
+      <div class="flex items-center gap-2 mb-12 px-2">
+        <div class="step-dot" id="dot1">1</div>
+        <div class="step-line" id="line1"></div>
+        <div class="step-dot idle" id="dot2">2</div>
+        <div class="step-line" id="line2"></div>
+        <div class="step-dot idle" id="dot3">3</div>
+        <div class="step-line" id="line3"></div>
+        <div class="step-dot idle" id="dot4">✓</div>
+      </div>
+
+      <!-- ===== STEP 1: Escolha o Plano ===== -->
+      <div id="step1" class="float-up">
+        <h1 class="text-3xl font-black mb-2">Escolha seu plano</h1>
+        <p class="text-slate-400 text-sm mb-8">Comece em segundos. Cancele quando quiser.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10" id="grid-planos"></div>
+
+        <!-- Comparativo compacto -->
+        <div class="glass rounded-2xl overflow-hidden mb-8">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-white/5 text-slate-400 text-xs uppercase tracking-widest">
+                <th class="py-3 px-4 text-left">Recurso</th>
+                <th class="py-3 px-4 text-center">BASIC</th>
+                <th class="py-3 px-4 text-center text-blue-400">PRO</th>
+                <th class="py-3 px-4 text-yellow-400 text-center">SUPER</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-white/5">
+              <tr><td class="py-2.5 px-4 text-slate-300">Produtos</td><td class="py-2.5 px-4 text-center text-slate-400">200</td><td class="py-2.5 px-4 text-center text-blue-300">Ilimitado</td><td class="py-2.5 px-4 text-center text-yellow-400">Ilimitado</td></tr>
+              <tr><td class="py-2.5 px-4 text-slate-300">Operadores</td><td class="py-2.5 px-4 text-center text-slate-400">1</td><td class="py-2.5 px-4 text-center text-blue-300">10</td><td class="py-2.5 px-4 text-center text-yellow-400">Ilimitado</td></tr>
+              <tr><td class="py-2.5 px-4 text-slate-300">Gerentes</td><td class="py-2.5 px-4 text-center text-slate-500">—</td><td class="py-2.5 px-4 text-center text-blue-300">1</td><td class="py-2.5 px-4 text-center text-yellow-400">Ilimitado</td></tr>
+              <tr><td class="py-2.5 px-4 text-slate-300">Suporte</td><td class="py-2.5 px-4 text-center text-slate-400">E-mail</td><td class="py-2.5 px-4 text-center text-blue-300">WhatsApp</td><td class="py-2.5 px-4 text-center text-yellow-400">24h Prioritário</td></tr>
+              <tr><td class="py-2.5 px-4 text-slate-300">Personalização</td><td class="py-2.5 px-4 text-center text-red-300">×</td><td class="py-2.5 px-4 text-center text-red-300">×</td><td class="py-2.5 px-4 text-center text-yellow-400">✓</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <button onclick="irParaStep2()" id="btn-step1" disabled
+          class="w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest bg-slate-700 text-slate-500 transition-all"
+          >Selecione um plano para continuar →</button>
+      </div>
+
+      <!-- ===== STEP 2: Dados da Empresa ===== -->
+      <div id="step2" class="hidden float-up">
+        <button onclick="voltarStep(1)" class="text-slate-400 hover:text-white text-xs mb-6 flex items-center gap-1">← Voltar</button>
+        <h1 class="text-3xl font-black mb-2">Dados da empresa</h1>
+        <p class="text-slate-400 text-sm mb-8">Informe os dados para ativar sua conta.</p>
+
+        <div class="glass rounded-2xl p-6 space-y-4 mb-6">
+          <!-- Plano selecionado badge -->
+          <div id="badge-plano-sel" class="flex items-center justify-between p-3 rounded-xl" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25)">
+            <span class="text-xs text-slate-400">Plano selecionado</span>
+            <span class="text-blue-400 font-black text-sm" id="label-plano-sel">—</span>
+          </div>
+
+          <div>
+            <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Razão Social / Nome da Loja *</label>
+            <input class="inp" id="f-razao" type="text" placeholder="Ex: Mercado do João" required>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Seu Nome *</label>
+              <input class="inp" id="f-nome" type="text" placeholder="Nome completo" required>
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">WhatsApp *</label>
+              <input class="inp" id="f-whats" type="tel" placeholder="(00) 00000-0000" required>
+            </div>
+          </div>
+          <div>
+            <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">E-mail de Acesso *</label>
+            <input class="inp" id="f-email" type="email" placeholder="contato@empresa.com" required>
+            <p class="text-[10px] text-slate-500 mt-1">Este e-mail será sua senha inicial de acesso ao sistema.</p>
+          </div>
+
+          <!-- Campo de Indicação (visível só quando habilitado) -->
+          <div id="campo-indicacao" class="hidden">
+            <div class="border-t border-white/5 pt-4">
+              <label class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Código de Indicação <span class="text-slate-600">(opcional)</span></label>
+              <input class="inp" id="f-indicacao" type="text" placeholder="Ex: mercadodaana"
+                oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_-]/g,'')">
+              <p class="text-[10px] text-slate-500 mt-1">Digite o código (slug) da empresa que te indicou para o PDVo.</p>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="gerarPix()" id="btn-gerar-pix"
+          class="w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest bg-blue-600 hover:bg-blue-500 transition-all">
+          Gerar QR Code PIX →
+        </button>
+      </div>
+
+      <!-- ===== STEP 3: PIX ===== -->
+      <div id="step3" class="hidden float-up text-center">
+        <button onclick="voltarStep(2)" class="text-slate-400 hover:text-white text-xs mb-6 flex items-center gap-1">← Voltar</button>
+        <h1 class="text-3xl font-black mb-2">Pague via PIX</h1>
+        <p class="text-slate-400 text-sm mb-8">Escaneie o QR Code ou copie o código abaixo.</p>
+
+        <!-- QR + valor -->
+        <div class="glass rounded-2xl p-6 mb-6 inline-block w-full max-w-sm mx-auto">
+          <div class="bg-white rounded-2xl p-3 inline-block mb-4 shadow-2xl">
+            <img id="qr-img" src="" class="w-52 h-52 block">
+          </div>
+          <div class="text-center mb-4">
+            <p class="text-[10px] text-slate-500 uppercase font-bold">Total a pagar</p>
+            <p class="text-3xl font-black text-green-400" id="qr-valor">R$ 0,00</p>
+            <p class="text-[10px] text-slate-500 mt-1">Plano <span class="text-blue-400 font-bold" id="qr-plano">—</span></p>
+          </div>
+
+          <!-- Copia e cola -->
+          <div>
+            <p class="text-[10px] text-slate-500 uppercase font-bold mb-1.5 text-left">Copia e Cola</p>
+            <div class="flex gap-2">
+              <input id="qr-payload" readonly type="text"
+                class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-blue-400 font-mono text-[10px] outline-none">
+              <button onclick="copiarPix()"
+                class="bg-slate-700 hover:bg-slate-600 text-white px-4 rounded-xl text-xs font-bold transition-all flex items-center gap-1">
+                📋 Copiar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Referência -->
+        <p class="text-xs text-slate-500 mb-6">Referência do pedido: <span class="text-slate-300 font-mono font-bold" id="qr-ref">—</span></p>
+
+        <button onclick="confirmarPagamento()" id="btn-paguei"
+          class="w-full max-w-sm py-4 rounded-2xl font-black text-sm uppercase tracking-widest bg-green-600 hover:bg-green-500 transition-all">
+          ✅ Já Paguei — Notificar Equipe
+        </button>
+        <p class="text-[10px] text-slate-500 mt-3">Após confirmar, nossa equipe verifica e ativa seu acesso.</p>
+      </div>
+
+      <!-- ===== STEP 4: Sucesso ===== -->
+      <div id="step4" class="hidden float-up text-center py-10">
+        <div class="relative inline-block mb-8">
+          <div class="w-24 h-24 rounded-full bg-green-500/20 flex items-center justify-center mx-auto">
+            <span class="text-5xl">✅</span>
+            <span class="absolute inset-0 rounded-full border-2 border-green-500 pulse-ring"></span>
+          </div>
+        </div>
+        <h1 class="text-3xl font-black mb-3 text-green-400">Pedido Enviado!</h1>
+        <p class="text-slate-400 mb-2 max-w-sm mx-auto">Nossa equipe recebeu sua solicitação e vai ativar seu acesso após confirmar o pagamento.</p>
+        <p class="text-slate-500 text-sm mb-8">Fique de olho no WhatsApp <span class="font-bold text-slate-300" id="succ-whats"></span>.</p>
+
+        <div class="glass rounded-2xl p-5 max-w-sm mx-auto mb-8 text-left space-y-2">
+          <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-3">Resumo do Pedido</p>
+          <div class="flex justify-between text-sm"><span class="text-slate-400">Empresa</span><span class="font-bold" id="succ-empresa">—</span></div>
+          <div class="flex justify-between text-sm"><span class="text-slate-400">Plano</span><span class="font-bold text-blue-400" id="succ-plano">—</span></div>
+          <div class="flex justify-between text-sm"><span class="text-slate-400">Valor</span><span class="font-bold text-green-400" id="succ-valor">—</span></div>
+          <div class="flex justify-between text-sm"><span class="text-slate-400">Ref.</span><span class="font-mono text-xs text-slate-300" id="succ-ref">—</span></div>
+        </div>
+
+        <a href="login.html" class="inline-block bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-2xl font-black text-sm uppercase tracking-widest transition-all">
+          Ir para Login →
+        </a>
+      </div>
+
+      </div><!-- /aba-assinar -->
+
+      <!-- ===== ABA: MINHAS INDICAÇÕES ===== -->
+      <div id="aba-indicacoes" class="hidden">
+        <div class="glass rounded-2xl p-6 mb-6">
+          <h2 class="text-xl font-black mb-1">Minhas Indicações</h2>
+          <p class="text-slate-400 text-sm mb-4" id="ind-desc">Carregando suas indicações...</p>
+          <!-- Campo slug só aparece para usuários não autenticados -->
+          <div class="flex gap-3" id="ind-busca-manual" style="display:none!important">
+            <input class="inp flex-1" id="ind-slug" type="text" placeholder="Ex: mercadodaana"
+              oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_-]/g,'')">
+            <button onclick="buscarIndicacoes()" id="btn-buscar-ind"
+              class="px-5 rounded-xl bg-blue-600 hover:bg-blue-500 font-black text-sm uppercase tracking-widest transition-all whitespace-nowrap">
+              Buscar →
+            </button>
+          </div>
+          <p id="ind-err" class="text-red-400 text-xs mt-2 hidden"></p>
+        </div>
+
+        <!-- Resultado -->
+        <div id="ind-resultado" class="hidden space-y-5">
+
+          <!-- Info da empresa + recompensa -->
+          <div class="glass rounded-2xl p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-11 h-11 rounded-xl bg-blue-600/20 flex items-center justify-center text-blue-400 font-black text-xl flex-shrink-0" id="ind-avatar">A</div>
+              <div>
+                <p class="font-black text-slate-200 leading-tight" id="ind-razao">—</p>
+                <p class="text-[11px] text-slate-500">Código: <span class="text-blue-400 font-mono font-bold" id="ind-codigo-display">—</span></p>
+              </div>
+            </div>
+            <div id="ind-recompensa-box" class="hidden p-3 rounded-xl border border-amber-500/20 bg-amber-500/5">
+              <p class="text-[10px] text-amber-400 uppercase font-bold tracking-widest mb-0.5">🎁 Recompensa por Indicação</p>
+              <p class="text-sm text-slate-200" id="ind-recompensa-txt">—</p>
+            </div>
+          </div>
+
+          <!-- Contador de indicações -->
+          <div class="grid grid-cols-2 gap-4">
+            <div class="glass rounded-2xl p-5 text-center">
+              <p class="text-4xl font-black text-blue-400" id="ind-num">0</p>
+              <p class="text-[11px] text-slate-500 uppercase font-bold tracking-widest mt-1">Indicados</p>
+            </div>
+            <div class="glass rounded-2xl p-5 text-center">
+              <p class="text-4xl font-black text-green-400" id="ind-num-valid">0</p>
+              <p class="text-[11px] text-slate-500 uppercase font-bold tracking-widest mt-1">Validados</p>
+            </div>
+          </div>
+
+          <!-- Card: Compartilhar link de indicação -->
+          <div class="rounded-2xl border border-blue-500/30 bg-blue-500/5 p-5">
+            <p class="text-[10px] text-blue-400 uppercase font-black tracking-widest mb-3">🔗 Seu Link de Indicação</p>
+            <p class="text-[11px] text-slate-400 mb-3">Compartilhe este link. Quem assinar pelo seu link é contado como sua indicação.</p>
+
+            <!-- URL exibida + copiar -->
+            <div class="flex gap-2 mb-4">
+              <input id="ind-share-url" readonly type="text"
+                class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-blue-300 font-mono text-[11px] outline-none cursor-pointer"
+                onclick="this.select()" placeholder="Carregando link...">
+              <button onclick="copiarLinkIndicacao()"
+                class="flex-shrink-0 bg-slate-700 hover:bg-slate-600 text-white px-4 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap">
+                📋 Copiar
+              </button>
+            </div>
+
+            <!-- Botões de compartilhamento -->
+            <div class="grid grid-cols-3 gap-2">
+              <button onclick="compartilharWhatsApp()"
+                class="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-green-600/20 hover:bg-green-600/40 border border-green-500/20 text-green-400 transition-all text-xs font-bold">
+                <span class="text-xl">💬</span>WhatsApp
+              </button>
+              <button onclick="copiarLinkIndicacao()"
+                class="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/20 text-blue-400 transition-all text-xs font-bold">
+                <span class="text-xl">📋</span>Copiar Link
+              </button>
+              <button onclick="compartilharNativo()"
+                id="btn-share-nativo"
+                class="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-700/50 hover:bg-slate-700 border border-slate-600/30 text-slate-300 transition-all text-xs font-bold">
+                <span class="text-xl">📤</span>Compartilhar
+              </button>
+            </div>
+          </div>
+
+          <!-- Lista de indicações -->
+          <div class="glass rounded-2xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-white/5 flex items-center justify-between">
+              <h3 class="font-bold text-slate-200 text-sm">Empresas Indicadas</h3>
+              <span class="text-[10px] text-slate-500 font-bold" id="ind-count">0 indicações</span>
+            </div>
+            <div id="ind-lista" class="divide-y divide-white/5"></div>
+          </div>
+
+        </div><!-- /ind-resultado -->
+      </div><!-- /aba-indicacoes -->
+
+    </main>
+  </div>
+
+  <script>
+    // ---- State ----
+    let currentStep = 1;
+    let planoSel    = null;
+    let pixRef      = null;
+
+    const PLANOS = [
+      { id: 1, nome: 'BASIC',  valor: 10.00,  destaque: false,
+        features: ['200 produtos', '1 operador', 'Suporte por e-mail'] },
+      { id: 2, nome: 'PRO',    valor: 25.00,  destaque: true,
+        features: ['Produtos ilimitados', '10 operadores', '1 gerente', 'Suporte WhatsApp', 'Relatórios'] },
+      { id: 3, nome: 'SUPER',  valor: 109.99, destaque: false,
+        features: ['Tudo ilimitado', 'Suporte 24h', 'Multi-gerente', 'Prioridade máxima', 'Site & APP Personalizado'] },
+    ];
+
+    // ---- Render planos ----
+    function renderPlanos() {
+      const grid = document.getElementById('grid-planos');
+      grid.innerHTML = PLANOS.map(p => `
+        <div onclick="selecionarPlano(${p.id})"
+          class="plan-card glass rounded-2xl p-5 flex flex-col gap-4 border border-white/5 ${p.destaque ? 'destaque' : ''}"
+          id="card-${p.id}">
+          ${p.destaque ? '<div class="text-center"><span class="badge-plan bg-blue-500/20 text-blue-300 border border-blue-500/30">⭐ Mais popular</span></div>' : '<div class="h-6"></div>'}
+          <div>
+            <p class="text-[10px] font-black text-slate-400 tracking-widest mb-1">${p.nome}</p>
+            <p class="text-4xl font-black text-white">R$&nbsp;${p.valor.toFixed(2).replace('.',',')}</p>
+            <p class="text-[10px] text-slate-500">/mês</p>
+          </div>
+          <ul class="space-y-1.5 text-xs text-slate-400">
+            ${p.features.map(f => `<li class="flex items-center gap-2"><span class="text-green-400">✓</span>${f}</li>`).join('')}
+          </ul>
+          <div class="mt-auto">
+            <div id="btn-card-${p.id}" class="w-full py-2.5 rounded-xl text-center text-xs font-bold uppercase tracking-widest border border-slate-700 text-slate-400 transition-all">
+              Selecionar
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function selecionarPlano(id) {
+      planoSel = PLANOS.find(p => p.id === id);
+      PLANOS.forEach(p => {
+        const card = document.getElementById(`card-${p.id}`);
+        const btn  = document.getElementById(`btn-card-${p.id}`);
+        if (p.id === id) {
+          card.classList.add('selected');
+          btn.className = 'w-full py-2.5 rounded-xl text-center text-xs font-bold uppercase tracking-widest bg-blue-600 text-white';
+          btn.textContent = '✓ Selecionado';
+        } else {
+          card.classList.remove('selected');
+          btn.className = 'w-full py-2.5 rounded-xl text-center text-xs font-bold uppercase tracking-widest border border-slate-700 text-slate-400';
+          btn.textContent = 'Selecionar';
+        }
+      });
+      const btn1 = document.getElementById('btn-step1');
+      btn1.disabled = false;
+      btn1.className = 'w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition-all';
+      btn1.textContent = `Continuar com plano ${planoSel.nome} →`;
+    }
+
+    function irParaStep2() {
+      if (!planoSel) return;
+      document.getElementById('label-plano-sel').textContent = `${planoSel.nome} — R$ ${planoSel.valor.toFixed(2).replace('.',',')}`;
+      goToStep(2);
+    }
+
+    // ---- PIX ----
+    async function gerarPix() {
+      const razao = document.getElementById('f-razao').value.trim();
+      const nome  = document.getElementById('f-nome').value.trim();
+      const email = document.getElementById('f-email').value.trim();
+      const whats = document.getElementById('f-whats').value.trim();
+
+      if (!razao || !nome || !email || !whats) {
+        showError('Preencha todos os campos obrigatórios.'); return;
+      }
+      if (!email.includes('@')) { showError('E-mail inválido.'); return; }
+
+      const btn    = document.getElementById('btn-gerar-pix');
+      const codInd = document.getElementById('f-indicacao')?.value.trim() || '';
+      btn.disabled = true; btn.textContent = 'Gerando PIX...';
+
+      try {
+        const res = await fetch('./api/assinatura.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'gerar_pix',
+            plano_id: planoSel.id,
+            razao_social: razao,
+            nome, email,
+            whatsapp: whats,
+            codigo_indicacao: codInd,
+          })
+        });
+        const data = await res.json();
+        if (!data.payload) throw new Error(data.error || 'Erro ao gerar PIX');
+
+        pixRef = data.ref;
+        document.getElementById('qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(data.payload)}`;
+        document.getElementById('qr-valor').textContent = `R$ ${parseFloat(data.valor).toFixed(2).replace('.',',')}`;
+        document.getElementById('qr-plano').textContent = data.rank;
+        document.getElementById('qr-payload').value = data.payload;
+        document.getElementById('qr-ref').textContent = data.ref || '—';
+        goToStep(3);
+      } catch (e) {
+        showError(e.message || 'Erro de conexão.');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Gerar QR Code PIX →';
+      }
+    }
+
+    async function confirmarPagamento() {
+      const btn = document.getElementById('btn-paguei');
+      btn.disabled = true; btn.textContent = 'Enviando...';
+
+      try {
+        await fetch('./api/assinatura.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'confirmar_pagamento', ref: pixRef })
+        });
+
+        // Preenche tela de sucesso
+        document.getElementById('succ-whats').textContent   = document.getElementById('f-whats').value;
+        document.getElementById('succ-empresa').textContent = document.getElementById('f-razao').value;
+        document.getElementById('succ-plano').textContent   = planoSel.nome;
+        document.getElementById('succ-valor').textContent   = `R$ ${planoSel.valor.toFixed(2).replace('.',',')}`;
+        document.getElementById('succ-ref').textContent     = pixRef || '—';
+        goToStep(4);
+      } catch (e) {
+        showError('Erro de conexão. Tente novamente.');
+        btn.disabled = false; btn.textContent = '✅ Já Paguei — Notificar Equipe';
+      }
+    }
+
+    function copiarPix() {
+      const v = document.getElementById('qr-payload').value;
+      if (!v) return;
+      navigator.clipboard.writeText(v).then(() => showToast('Código PIX copiado!', 'green')).catch(() => {
+        document.getElementById('qr-payload').select();
+        document.execCommand('copy');
+        showToast('Código PIX copiado!', 'green');
+      });
+    }
+
+    // ---- Abas ----
+    function mostrarAba(aba) {
+      ['assinar','indicacoes'].forEach(a => {
+        document.getElementById(`aba-${a}`).classList.toggle('hidden', a !== aba);
+        const tab = document.getElementById(`tab-${a}`);
+        if (a === aba) {
+          tab.className = 'flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest bg-blue-600 text-white transition-all';
+        } else {
+          tab.className = 'flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-800 text-slate-400 border border-slate-700 hover:border-blue-500 hover:text-blue-400 transition-all';
+        }
+      });
+      window.scrollTo({top:0,behavior:'smooth'});
+
+      // Auto-carrega indicações do usuário logado ao abrir a aba
+      if (aba === 'indicacoes') {
+        let loggedUser = null;
+        try { loggedUser = JSON.parse(localStorage.getItem('user')); } catch(e) {}
+        const slug = loggedUser?.slug || '';
+        const slugInput = document.getElementById('ind-slug');
+        const descEl    = document.getElementById('ind-desc');
+        if (slug) {
+          if (slugInput) slugInput.value = slug;
+          if (descEl) descEl.textContent = 'Veja quem você indicou e acompanhe seus ganhos.';
+          buscarIndicacoes(slug);
+        } else {
+          // Usuário não logado ou sem slug: mostrar campo manual
+          const manual = document.getElementById('ind-busca-manual');
+          if (manual) manual.style.removeProperty('display');
+          if (descEl) descEl.textContent = 'Digite o código (slug) da sua empresa para ver quem você indicou.';
+        }
+      }
+    }
+
+    // ---- Buscar indicações do cliente ----
+    let _indSlugAtual = '';
+
+    async function buscarIndicacoes(slugOverride) {
+      const slugInput = document.getElementById('ind-slug');
+      const slug = slugOverride || (slugInput ? slugInput.value.trim() : '');
+      const err  = document.getElementById('ind-err');
+      const res2 = document.getElementById('ind-resultado');
+      err.classList.add('hidden');
+      res2.classList.add('hidden');
+      if (!slug) { err.textContent = 'Informe o código da empresa.'; err.classList.remove('hidden'); return; }
+
+      const btn = document.getElementById('btn-buscar-ind');
+      if (btn) { btn.disabled = true; btn.textContent = 'Buscando...'; }
+      try {
+        const res  = await fetch('./api/assinatura.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'get_indicacoes', slug })
+        });
+        const data = await res.json();
+        if (data.error) { err.textContent = data.error; err.classList.remove('hidden'); return; }
+
+        _indSlugAtual = slug;
+
+        // Info da empresa
+        document.getElementById('ind-razao').textContent = data.razao || slug;
+        document.getElementById('ind-avatar').textContent = (data.razao || slug).charAt(0).toUpperCase();
+        document.getElementById('ind-codigo-display').textContent = slug;
+
+        // Contadores
+        const lista      = data.indicacoes || [];
+        const validados  = lista.filter(i => i.status === 'validado').length;
+        document.getElementById('ind-num').textContent       = lista.length;
+        document.getElementById('ind-num-valid').textContent = validados;
+        document.getElementById('ind-count').textContent     = `${lista.length} indicaç${lista.length === 1 ? 'ão' : 'ões'}`;
+
+        // Link de compartilhamento
+        const base     = window.location.origin + window.location.pathname;
+        const shareUrl = `${base}?ref=${encodeURIComponent(slug)}`;
+        document.getElementById('ind-share-url').value = shareUrl;
+
+        // Recompensa
+        const recompBox = document.getElementById('ind-recompensa-box');
+        const recompTxt = document.getElementById('ind-recompensa-txt');
+        if (data.recompensa_desc) {
+          recompTxt.textContent = data.recompensa_desc;
+          recompBox.classList.remove('hidden');
+        } else {
+          recompBox.classList.add('hidden');
+        }
+
+        // Lista de indicados
+        const listaEl  = document.getElementById('ind-lista');
+        const statusMap = { pendente:'⏳ Pendente', validado:'✅ Validado', rejeitado:'❌ Rejeitado' };
+        const colorMap  = { pendente:'text-amber-400', validado:'text-green-400', rejeitado:'text-red-400' };
+        if (!lista.length) {
+          listaEl.innerHTML = `
+            <div class="p-8 text-center">
+              <p class="text-3xl mb-2">🤝</p>
+              <p class="text-slate-500 text-sm">Você ainda não indicou nenhuma empresa.</p>
+              <p class="text-slate-600 text-xs mt-1">Compartilhe seu link e comece a indicar!</p>
+            </div>`;
+        } else {
+          listaEl.innerHTML = lista.map(i => `
+            <div class="flex items-center gap-4 px-6 py-4">
+              <div class="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-slate-300 font-black flex-shrink-0">
+                ${(i.indicado_razao||i.indicado_email||'?').charAt(0).toUpperCase()}
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="font-semibold text-slate-200 truncate">${escHtml(i.indicado_razao || '—')}</p>
+                <p class="text-[11px] text-slate-500 truncate">${escHtml(i.indicado_email)}</p>
+              </div>
+              <div class="text-right flex-shrink-0">
+                <p class="text-xs font-bold ${colorMap[i.status]||'text-slate-400'}">${statusMap[i.status]||i.status}</p>
+                <p class="text-[10px] text-slate-600">${fmtDate(i.created_at)}</p>
+              </div>
+            </div>
+          `).join('');
+        }
+        res2.classList.remove('hidden');
+      } catch (e) {
+        err.textContent = 'Erro de conexão.'; err.classList.remove('hidden');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Buscar →'; }
+      }
+    }
+
+    // ---- Compartilhamento ----
+    function _getLinkIndicacao() {
+      return document.getElementById('ind-share-url').value || '';
+    }
+
+    function copiarLinkIndicacao() {
+      const url = _getLinkIndicacao();
+      if (!url) return;
+      navigator.clipboard.writeText(url)
+        .then(() => showToast('Link copiado!', 'green'))
+        .catch(() => {
+          document.getElementById('ind-share-url').select();
+          document.execCommand('copy');
+          showToast('Link copiado!', 'green');
+        });
+    }
+
+    function compartilharWhatsApp() {
+      const url = _getLinkIndicacao();
+      if (!url) return;
+      const razao = document.getElementById('ind-razao').textContent || 'PDVo';
+      const texto = encodeURIComponent(
+        `🛒 Use meu link para assinar o PDVo e já começar com tudo certo!\n\n👉 ${url}`
+      );
+      window.open(`https://wa.me/?text=${texto}`, '_blank');
+    }
+
+    async function compartilharNativo() {
+      const url   = _getLinkIndicacao();
+      const razao = document.getElementById('ind-razao').textContent || 'PDVo';
+      if (!url) return;
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: `Indicação PDVo — ${razao}`,
+            text:  'Use meu link para assinar o PDVo!',
+            url,
+          });
+        } catch (e) { /* cancelado pelo usuário */ }
+      } else {
+        copiarLinkIndicacao();
+        showToast('Compartilhamento nativo não disponível. Link copiado!', 'blue');
+      }
+    }
+
+    function escHtml(s) {
+      return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function fmtDate(d) {
+      if (!d) return '—';
+      const dt = new Date((d||'').replace ? (d||'').replace(' ','T') : d);
+      return isNaN(dt) ? String(d) : dt.toLocaleDateString('pt-BR');
+    }
+
+    // ---- Navigation ----
+    function goToStep(n) {
+      [1,2,3,4].forEach(i => {
+        document.getElementById(`step${i}`).classList.toggle('hidden', i !== n);
+      });
+      updateStepper(n);
+      currentStep = n;
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
+
+    function voltarStep(n) { goToStep(n); }
+
+    function updateStepper(active) {
+      [1,2,3,4].forEach(i => {
+        const dot  = document.getElementById(`dot${i}`);
+        const line = document.getElementById(`line${i}`);
+        if (i < active) {
+          dot.className  = 'step-dot done';
+          dot.textContent = '✓';
+          if (line) line.className = 'step-line done';
+        } else if (i === active) {
+          dot.className  = 'step-dot active';
+          dot.textContent = i < 4 ? i : '✓';
+          if (line) line.className = 'step-line';
+        } else {
+          dot.className  = 'step-dot idle';
+          dot.textContent = i < 4 ? i : '✓';
+          if (line) line.className = 'step-line';
+        }
+      });
+    }
+
+    // ---- Utils ----
+    function showError(msg) {
+      let el = document.getElementById('err-toast');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'err-toast';
+        el.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-2xl text-sm font-bold z-50 shadow-2xl';
+        document.body.appendChild(el);
+      }
+      el.textContent = msg;
+      el.style.display = 'block';
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.style.display = 'none', 4000);
+    }
+
+    function showToast(msg, color = 'blue') {
+      const colors = { green: 'bg-green-600', blue: 'bg-blue-600', red: 'bg-red-600' };
+      const el = document.createElement('div');
+      el.className = `fixed top-4 right-4 ${colors[color]||colors.blue} text-white px-5 py-3 rounded-2xl text-sm font-bold z-50 shadow-2xl`;
+      el.textContent = msg;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 3000);
+    }
+
+    // ---- Init ----
+    renderPlanos();
+    updateStepper(1);
+    document.getElementById('dot1').classList.remove('idle');
+    document.getElementById('dot1').classList.add('active');
+
+    // Lê parâmetros da URL
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+
+      // ?ref=slug → pré-preenche campo de indicação na aba Assinar
+      const refParam = params.get('ref') || params.get('ind') || '';
+      if (refParam) {
+        const campo = document.getElementById('f-indicacao');
+        if (campo) campo.value = refParam.toLowerCase().replace(/[^a-z0-9_-]/g,'');
+        document.getElementById('campo-indicacao').classList.remove('hidden');
+      }
+
+      // ?tab=indicacoes → abre direto na aba Indicações
+      if (params.get('tab') === 'indicacoes') {
+        mostrarAba('indicacoes');
+        // Se veio com ?slug=xxx, busca automaticamente
+        const slugParam = params.get('slug');
+        if (slugParam) {
+          document.getElementById('ind-slug').value = slugParam.toLowerCase().replace(/[^a-z0-9_-]/g,'');
+          setTimeout(() => buscarIndicacoes(), 300);
+        }
+      }
+    })();
+
+    // Verifica se sistema de indicações está ativo
+    (async () => {
+      try {
+        const r = await fetch('./api/assinatura.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'get_indicacoes', slug: '_check_' })
+        });
+        const d = await r.json();
+        if (d.ativo) document.getElementById('campo-indicacao').classList.remove('hidden');
+      } catch (e) {}
+    })();
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
